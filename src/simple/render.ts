@@ -83,8 +83,17 @@ function featureRow(project: SiteProject, index: number) {
       ${project.role ? `<p class="role"><span class="label">My role</span>${esc(project.role)}</p>` : ""}
       <p>${esc(project.summary || "Details for this project are coming soon.")}</p>
       ${project.built.length ? `<p class="label">What I built</p>${builtList(project)}` : ""}
+      ${stackList(project)}
+      <button type="button" class="btn btn-ghost visit" data-open-project="${esc(project.id)}">Visit its building →</button>
     </div>
   </article>`;
+}
+
+function stackList(project: SiteProject) {
+  if (!project.stack.length) return "";
+  return `<p class="label">How I built it</p><ol class="stack">${project.stack
+    .map(([layer, what]) => `<li><span>${esc(layer)}</span>${esc(what)}</li>`)
+    .join("")}</ol>`;
 }
 
 function projectCard(project: SiteProject) {
@@ -100,6 +109,7 @@ function projectCard(project: SiteProject) {
       <p class="summary">${esc(project.summary || "Details for this project are coming soon.")}</p>
       ${project.tags.length ? `<ul class="tags">${project.tags.slice(0, 4).map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
       ${project.built.length ? `<details><summary>What I built</summary>${builtList(project)}</details>` : ""}
+      <button type="button" class="card-visit" data-open-project="${esc(project.id)}">Visit in 3D →</button>
     </div>
   </article>`;
 }
@@ -224,7 +234,15 @@ export function renderSimple(projects: SiteProject[], profile: SiteProfile) {
     </div>
   </section>`;
 
-  const footer = `<footer class="footer"><p>© ${new Date().getFullYear()} ${esc(profile.name)} · Built with Vite and TypeScript</p></footer>`;
+  const play = `<section class="section play-band reveal" aria-labelledby="play-title">
+    <h2 id="play-title">Now play it.</h2>
+    <p>Every project on this page is a building in a 3D city. Drive a hover car to each one, or take the guided tour.</p>
+    <button type="button" class="btn btn-primary" data-open-city>Enter the 3D city</button>
+  </section>`;
+
+  const footer = `<footer class="footer"><p>© ${new Date().getFullYear()} ${esc(profile.name)} · Built with Vite, TypeScript and three.js</p></footer>`;
+
+  const transition = `<div class="drive-transition" data-drive-transition hidden role="status"><p></p></div>`;
 
   const city = `<section class="city" id="city" aria-label="3D city" tabindex="-1" hidden>
     <div class="city-canvas" data-city-canvas></div>
@@ -234,5 +252,5 @@ export function renderSimple(projects: SiteProject[], profile: SiteProfile) {
     </div>
   </section>`;
 
-  return [nav, `<main class="page">`, hero, selected, allProjects, experienceSection, skills, contact, `</main>`, footer, city].join("\n");
+  return [nav, `<main class="page">`, hero, selected, allProjects, experienceSection, skills, contact, play, `</main>`, footer, city, transition].join("\n");
 }

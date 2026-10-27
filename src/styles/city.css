@@ -112,6 +112,20 @@
 .cityh-tour {
   min-height: 40px;
   padding: 0 1rem;
+  white-space: nowrap;
+}
+
+.cityh-short {
+  display: none;
+}
+
+.cityh-menu {
+  white-space: nowrap;
+}
+
+.cityh-name strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cityh-link,
@@ -790,8 +804,18 @@
 
 @media (max-width: 900px) {
   .cityh-wide,
-  .cityh-name span {
+  .cityh-name span,
+  .cityh-long {
     display: none;
+  }
+
+  .cityh-short {
+    display: inline;
+  }
+
+  .cityh-tour,
+  .cityh-menu {
+    padding: 0 0.7rem;
   }
 }
 

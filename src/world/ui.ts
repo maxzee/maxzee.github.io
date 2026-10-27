@@ -74,7 +74,8 @@ export function createOverlay(root: HTMLElement, profile: SiteProfile, total: nu
 
   const actions = el("nav", "cityh-actions");
   actions.setAttribute("aria-label", "City");
-  const tourButton = button("Take the tour", "btn btn-primary cityh-tour", handlers.onTour);
+  const tourButton = button("", "btn btn-primary cityh-tour", handlers.onTour);
+  tourButton.innerHTML = `<span class="cityh-long">Take the tour</span><span class="cityh-short">Tour</span>`;
   const aboutButton = button("About", "cityh-link cityh-wide", handlers.onAbout);
   const contactButton = button("Contact", "cityh-link cityh-wide", handlers.onContact);
   const simpleButton = button("1-page site", "cityh-link cityh-wide");

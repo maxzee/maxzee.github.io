@@ -172,6 +172,30 @@ function closeCity() {
 }
 
 openButtons.forEach((button) => button.addEventListener("click", () => openCity(button)));
+
+// "Visit its building": a short transition, then straight to that project in Drive
+const transition = document.querySelector<HTMLElement>("[data-drive-transition]");
+document.querySelectorAll<HTMLButtonElement>("[data-open-project]").forEach((button) => {
+  if (!webgl) {
+    button.disabled = true;
+    button.title = "Your browser can't show the 3D city (WebGL is unavailable).";
+    return;
+  }
+  button.addEventListener("click", () => {
+    const id = button.dataset.openProject!;
+    const name = button.closest("article")?.querySelector("h3")?.textContent ?? "the city";
+    if (reducedMotion || !transition) {
+      openCity(button, id);
+      return;
+    }
+    transition.querySelector("p")!.textContent = `Driving to ${name}…`;
+    transition.hidden = false;
+    window.setTimeout(() => {
+      openCity(button, id);
+      transition.hidden = true;
+    }, 600);
+  });
+});
 // the city builds its own "1-page site" buttons, so listen at the document
 document.addEventListener("click", (event) => {
   if (event.target instanceof Element && event.target.closest("[data-close-city]")) closeCity();
