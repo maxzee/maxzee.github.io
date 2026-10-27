@@ -24,5 +24,13 @@ built:
 visibility: 'yes'
 media:
   video: media/MotoRacerDemo.mp4
+stack:
+  - - Gameplay
+    - Bike handling and scoring
+  - - AI
+    - Traffic behaviour
+  - - Performance
+    - Mobile optimization
+district: mobile
 ---
 

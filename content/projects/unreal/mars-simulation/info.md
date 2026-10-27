@@ -24,5 +24,13 @@ built:
 visibility: 'yes'
 media:
   video: media/Mars.mp4
+stack:
+  - - Cinematics
+    - Sequencer shots and transitions
+  - - Gameplay
+    - Mission logic in C++ and Blueprints
+  - - Physics
+    - Physics-driven movement and interaction
+district: unreal
 ---
 

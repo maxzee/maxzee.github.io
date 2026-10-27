@@ -4,6 +4,7 @@ import "@fontsource/rajdhani/700.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "./styles/tokens.css";
 import "./styles/simple.css";
+import "./styles/city.css";
 
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -144,7 +145,7 @@ async function openCity(trigger?: HTMLElement, projectId?: string) {
   document.documentElement.classList.add("city-open");
   if (!projectId) history.replaceState(null, "", "#city");
   reel?.pause();
-  cityEl.querySelector<HTMLButtonElement>('[data-view="drive"]')?.focus();
+  cityEl.focus();
 
   city ??= import("./world/app").then((module) => module.createCity(cityEl, { reducedMotion }));
   try {
@@ -171,7 +172,10 @@ function closeCity() {
 }
 
 openButtons.forEach((button) => button.addEventListener("click", () => openCity(button)));
-document.querySelector("[data-close-city]")?.addEventListener("click", closeCity);
+// the city builds its own "1-page site" buttons, so listen at the document
+document.addEventListener("click", (event) => {
+  if (event.target instanceof Element && event.target.closest("[data-close-city]")) closeCity();
+});
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape" || !cityOpen) return;
   if (cityHandle?.handleEscape()) return;

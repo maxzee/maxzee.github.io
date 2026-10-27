@@ -24,5 +24,13 @@ built:
 visibility: 'yes'
 media:
   video: 'media/Cover Fire FPS – Mobile Game Development (Unity, iOS & Android).mp4'
+stack:
+  - - Player
+    - FPS controller
+  - - Combat
+    - Weapon systems
+  - - Missions
+    - Mission flow
+district: mobile
 ---
 

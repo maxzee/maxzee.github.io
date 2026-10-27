@@ -24,5 +24,13 @@ built:
 visibility: 'yes'
 media:
   video: media/The Toon Tanks.mp4
+stack:
+  - - Gameplay
+    - Player and AI tank pawns in C++
+  - - AI
+    - Tracking and firing in range
+  - - FX
+    - 'Smoke, explosions and sound'
+district: unreal
 ---
 

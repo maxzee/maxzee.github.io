@@ -19,5 +19,6 @@ media:
 visibility: 'yes'
 featured: true
 order: 1
+district: team
 ---
 

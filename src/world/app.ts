@@ -4,12 +4,14 @@ import profileData from "../generated/profile.json";
 import projectsData from "../generated/projects.json";
 import type { SiteProfile, SiteProject } from "../simple/render";
 import { buildAboutStudio, buildBuilding, buildContactTower } from "./buildings";
+import { createHints, createVisits } from "./hints";
 import { createInput } from "./input";
 import { layoutCity, PLOT, type Lot } from "./layout";
 import { applyMaterialLook, createMaterials, ENGINE_HEX, type AccentKey, type Look, type Materials } from "./materials";
+import { planRoute, Trip } from "./route";
 import { buildPlaza, buildScenery } from "./scenery";
 import { groundTextTexture, infoBoardTexture, labelTexture, nameplateTexture, slateTexture } from "./textures";
-import { createOverlay, drawMinimap } from "./ui";
+import { createOverlay, drawMinimap, type ActionButton, type Option } from "./ui";
 import { buildHoverCar, Vehicle, type Collider } from "./vehicle";
 
 export type { Look };
@@ -26,15 +28,19 @@ const projects = projectsData as unknown as SiteProject[];
 const profile = profileData as unknown as SiteProfile;
 
 const LOOKS: Look[] = ["day", "night", "blueprint"];
+const TOUR = ["kingdomland", "nayzak", "orionmeta", "kungfu-karate", "mars-simulation", "contact"];
+const TOUR_HOLD = 11;
 const RING_OFFSET = 20;
 const RING_REACH = 7.5;
 const VIDEO_RANGE = 85;
 const MAX_PLAYING = 3;
+const INTRO = 2.6;
 
 const css = (hex: number) => `#${hex.toString(16).padStart(6, "0")}`;
 const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
+const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 function accentOf(project: SiteProject): AccentKey {
   return project.engines.length > 1 ? "dual" : project.engines[0];
@@ -94,14 +100,17 @@ interface Riser {
   delay: number;
 }
 
-interface Station {
+export interface Station {
   lot: Lot;
   kind: "project" | "about" | "contact";
+  id: string;
+  name: string;
   project?: SiteProject;
   color: number;
   ringAt: THREE.Vector3;
   ringMaterial: THREE.MeshBasicMaterial;
   bannerAt: THREE.Vector3;
+  centre: THREE.Vector3;
   screen: THREE.MeshBasicMaterial;
   video?: HTMLVideoElement;
   videoTexture?: THREE.VideoTexture;
@@ -115,7 +124,6 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
   ]).catch(() => undefined);
 
   const container = root.querySelector<HTMLElement>("[data-city-canvas]")!;
-  const hint = root.querySelector<HTMLElement>("[data-city-hint]");
   const coarse = window.matchMedia("(pointer: coarse)").matches;
   const lowPower = coarse || Math.min(window.innerWidth, window.innerHeight) < 820;
   root.classList.toggle("is-touch", coarse);
@@ -125,7 +133,7 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.shadowMap.enabled = !lowPower;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.domElement.setAttribute("aria-label", `3D city of ${profile.name}'s projects. Each building is one project.`);
+  renderer.domElement.setAttribute("aria-label", `3D city of ${profile.name}'s projects. Each building is one project. The 1-page site has the same content.`);
   renderer.domElement.setAttribute("role", "img");
   container.append(renderer.domElement);
 
@@ -152,6 +160,7 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
   const risers: Riser[] = [];
   const stations: Station[] = [];
   const colliders: Collider[] = [];
+  const pickables: THREE.Object3D[] = [];
   const lotColors = new Map<Lot, string>();
   const signs: THREE.Sprite[] = [];
   let plaza: ReturnType<typeof buildPlaza> | null = null;
@@ -250,16 +259,23 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
     scene.add(ringParts.group);
 
     risers.push({ group: building, extras: [bannerParts.group, sign, tag, ringParts.group], delay });
-    stations.push({
+    const station: Station = {
       lot,
       kind: lot.kind,
+      id: lot.project?.id ?? lot.kind,
+      name: lot.kind === "project" ? lot.project!.name : name,
       project: lot.project,
       color,
       ringAt: new THREE.Vector3(lot.x, 0, lot.z + RING_OFFSET),
       ringMaterial: ringParts.material,
       bannerAt: new THREE.Vector3(lot.x, 7, lot.z + 13),
+      centre: new THREE.Vector3(lot.x, Math.min(lot.height, 30) * 0.45, lot.z - 2),
       screen: bannerParts.screenMaterial,
-    });
+    };
+    stations.push(station);
+    building.userData.station = station;
+    bannerParts.group.userData.station = station;
+    pickables.push(building, bannerParts.group);
 
     const half = PLOT / 2 - 0.5;
     colliders.push({ minX: lot.x - half, maxX: lot.x + half, minZ: lot.z - half, maxZ: lot.z + half, top: lot.height + 0.4 });
@@ -268,6 +284,7 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
 
   // projects first, in grid order, then About and Contact
   stations.sort((a, b) => (a.kind === "project" ? 0 : 1) - (b.kind === "project" ? 0 : 1) || a.lot.index - b.lot.index);
+  const stationById = new Map(stations.map((s) => [s.id, s]));
 
   const blueprintEdges: THREE.Object3D[] = [];
   scene.traverse((o) => o.userData.blueprintEdge && blueprintEdges.push(o));
@@ -278,14 +295,57 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
   const vehicle = new Vehicle(carParts, colliders, span / 2 + 6, options.reducedMotion);
   vehicle.place(plazaLot.x, plazaLot.z + 4, 0);
 
-  // looks
+  // state
+  let view: View = "drive";
   let look: Look = "day";
-  const lookButtons = root.querySelectorAll<HTMLButtonElement>("[data-look]");
+  let mode: "free" | "trip" | "arrived" = "free";
+  let arrived: Station | null = null;
+  let trip: Trip | null = null;
+  let afterTrip: (() => void) | null = null;
+  let tour: { stops: Station[]; index: number; hold: number } | null = null;
+  let nearest: Station | null = null;
+  let introTime = options.reducedMotion ? INTRO : 0;
+  let running = false;
+
+  const visits = createVisits();
+
+  const overlay = createOverlay(root, profile, projects.length, {
+    onTour: startTour,
+    onAbout: () => goTo(stationById.get("about")!),
+    onContact: () => goTo(stationById.get("contact")!),
+    onOption: applyOption,
+    onPrompt: () => {
+      if (vehicle.flying) toggleFly();
+      else if (nearest) arrive(nearest);
+    },
+    onPanelPrev: () => step(-1, true),
+    onPanelNext: () => step(1, true),
+    onPanelClose: closePanel,
+    onTourNext: () => tour && (tour.index < tour.stops.length - 1 ? goTourStop(tour.index + 1) : stopTour()),
+    onTourExit: stopTour,
+    onFly: toggleFly,
+    onMenuToggle: (open) => {
+      if (open) hints.hide();
+    },
+  });
+  overlay.setVisited(visits.count);
+
+  const hints = createHints({
+    show: (text, onTry, onDismiss) => overlay.showHint(text, onTry, onDismiss),
+    hide: () => overlay.showHint(null),
+    apply: applyOption,
+    canShow: () => introTime >= INTRO && mode === "free" && !tour && !overlay.panelOpen && !overlay.menuOpen,
+    setUntried: (untried) => overlay.setUntried(untried),
+  });
+  hints.markTried("drive");
+  hints.markTried("day");
+
+  // looks
   function setLook(next: Look) {
     look = next;
+    root.dataset.look = next;
     const night = next === "night";
     const bp = next === "blueprint";
-    lookButtons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.look === next)));
     applyMaterialLook(m, next);
     scenery.applyLook(next);
     plaza?.applyLook(next);
@@ -300,9 +360,12 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
     sun.color.set(night ? 0x9fb4ff : 0xfff1d6);
     sun.intensity = bp ? 0 : night ? 0.35 : 2.2;
     renderer.toneMappingExposure = night ? 1.05 : 1;
+    overlay.setPressed(view, look);
+    for (const listener of lookListeners) listener(next);
+    // the panel shows build layers first in Blueprint
+    if (overlay.panelOpen && arrived) openPanel(arrived);
   }
-  lookButtons.forEach((button) => button.addEventListener("click", () => setLook(button.dataset.look as Look)));
-  setLook("day");
+  const lookListeners: ((look: Look) => void)[] = [];
 
   // camera and views
   const lookTarget = new THREE.Vector3(0, 4, 0);
@@ -325,6 +388,7 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
   controls.addEventListener("start", () => {
     lastInput = performance.now();
     controls.autoRotate = false;
+    glide = null;
   });
   controls.addEventListener("change", () => {
     const limit = span / 2;
@@ -333,96 +397,222 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
     controls.target.y = THREE.MathUtils.clamp(controls.target.y, 0, 30);
   });
 
-  let view: View = "drive";
-  const viewButtons = root.querySelectorAll<HTMLButtonElement>("[data-view]");
-  const HINTS: Record<View, string> = {
-    drive: coarse ? "Use the arrows to drive · tap the prompt to open" : "W A S D to drive · Shift boost · E open · V view · B look",
-    spectate: "Drag to orbit · scroll or pinch to zoom",
-  };
-
   function setView(next: View) {
     view = next;
     root.dataset.view = next;
-    viewButtons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === next)));
-    if (hint) hint.textContent = HINTS[next];
+    overlay.setPressed(view, look);
     const introDone = introTime >= INTRO;
     controls.enabled = next === "spectate" && introDone;
     if (next === "spectate") {
+      cancelTrip();
       controls.target.set(vehicle.position.x, 4, vehicle.position.z);
-      if (introDone) camera.position.set(vehicle.position.x + 40, 95, vehicle.position.z + 120);
+      if (introDone && !arrived) camera.position.set(vehicle.position.x + 40, 95, vehicle.position.z + 120);
       controls.update();
       lastInput = performance.now();
     } else {
       controls.autoRotate = false;
-      chaseLook.copy(lookTarget);
+      glide = null;
+      chaseLook.copy(controls.target);
     }
     input.clear();
   }
-  viewButtons.forEach((button) => button.addEventListener("click", () => setView(button.dataset.view as View)));
 
-  // overlay: prompt, project card, minimap, touch pads
-  let current: Station | null = null;
-  let nearest: Station | null = null;
-  const overlay = createOverlay(root, {
-    onPrev: () => step(-1),
-    onNext: () => step(1),
-    onClose: closeCard,
-    onOpenNearby: () => nearest && openStation(nearest),
-  });
-
-  function openStation(station: Station) {
-    current = station;
-    const color = css(station.color);
-    if (station.kind === "project" && station.project) {
-      overlay.showProject(station.project, color);
-      history.replaceState(null, "", `#${station.project.id}`);
-    } else if (station.kind === "about") overlay.showAbout(profile, projects.length);
-    else overlay.showContact(profile);
-    overlay.showPrompt(null);
+  function applyOption(option: Option) {
+    hints.markTried(option);
+    if (option === "simple") {
+      root.querySelector<HTMLElement>("[data-close-city]")?.click();
+      return;
+    }
+    if (option === "drive" || option === "spectate") setView(option);
+    else setLook(option);
   }
 
-  function closeCard() {
-    if (!overlay.hideCard()) return false;
-    current = null;
-    history.replaceState(null, "", "#city");
-    root.querySelector<HTMLButtonElement>(`[data-view="${view}"]`)?.focus();
+  // arrival: a case study that frames the building and shows a lower-third
+  function subtitleFor(station: Station) {
+    if (station.project) return [station.project.engineLabel, station.project.role].filter(Boolean).join(" — ") || "Details coming soon";
+    return station.kind === "about" ? `${profile.title}` : "GitHub · LinkedIn";
+  }
+
+  function neighbour(station: Station, direction: number) {
+    const index = stations.indexOf(station);
+    return stations[(index + direction + stations.length) % stations.length];
+  }
+
+  function arrivalButtons(station: Station): ActionButton[] {
+    const keep = { label: "Keep exploring", run: leaveArrival };
+    if (station.kind === "about") {
+      return [
+        { label: "Read more about me", primary: true, run: () => openPanel(station) },
+        { label: "Contact me →", run: () => goTo(stationById.get("contact")!) },
+        keep,
+      ];
+    }
+    if (station.kind === "contact") {
+      return [{ label: "GitHub", primary: true, href: profile.github }, { label: "LinkedIn", href: profile.linkedin }, keep];
+    }
+    const next = neighbour(station, 1);
+    return [
+      { label: "See full project details", primary: true, run: () => openPanel(station) },
+      { label: `Next: ${next.name} →`, run: () => step(1, false) },
+      keep,
+    ];
+  }
+
+  function arrive(station: Station, openDetails = false) {
+    hints.hide();
+    overlay.closeMenu();
+    cancelTrip();
+    mode = "arrived";
+    arrived = station;
+    if (view === "drive") vehicle.place(station.ringAt.x, station.ringAt.z, 0);
+    overlay.showArrival(station.name, subtitleFor(station), css(station.color), arrivalButtons(station));
+    history.replaceState(null, "", station.project ? `#${station.project.id}` : "#city");
+
+    if (station.project && visits.add(station.project.id)) {
+      overlay.setVisited(visits.count);
+      if (visits.count === 3 && visits.count < projects.length) {
+        overlay.showToast(`Nice, 3 down. Want to see all ${projects.length} at once?`, [
+          { label: "Open the 1-page site", primary: true, run: () => applyOption("simple") },
+          { label: "Keep driving" },
+        ]);
+      } else if (visits.count === projects.length) {
+        overlay.showToast("You explored the whole city.", [{ label: "GitHub", primary: true, href: profile.github }, { label: "Keep exploring" }], 14);
+      }
+    }
+
+    if (openDetails) openPanel(station);
+    else if (!tour) overlay.focusAction();
+  }
+
+  function openPanel(station: Station) {
+    if (station.project) overlay.showProject(station.project, css(station.color), look === "blueprint");
+    else if (station.kind === "about") overlay.showAbout();
+    else overlay.showContact();
+  }
+
+  function closePanel() {
+    if (!overlay.hidePanel()) return false;
+    overlay.focusAction();
     return true;
   }
 
-  function parkAt(station: Station) {
-    vehicle.place(station.ringAt.x, station.ringAt.z, 0);
-    camera.position.set(station.ringAt.x, 9, station.ringAt.z + 10);
-    if (view === "spectate") {
-      controls.target.copy(station.bannerAt);
-      controls.update();
-    }
+  function leaveArrival() {
+    overlay.hidePanel();
+    if (mode !== "arrived") return false;
+    overlay.hideArrival();
+    mode = "free";
+    arrived = null;
+    history.replaceState(null, "", "#city");
+    if (tour) stopTour();
+    return true;
   }
 
-  function step(direction: number) {
-    const index = current ? stations.indexOf(current) : -1;
-    const next = stations[(index + direction + stations.length) % stations.length];
-    parkAt(next);
-    openStation(next);
+  // getting to a building: hover-drive the streets, never teleport
+  function goTo(station: Station, openDetails = false) {
+    if (view === "spectate") {
+      leaveArrival();
+      glideTo(station);
+      arrive(station, openDetails);
+      return;
+    }
+    driveTo(station, () => arrive(station, openDetails));
+  }
+
+  function driveTo(station: Station, then: () => void) {
+    overlay.hidePanel();
+    if (mode === "arrived") {
+      overlay.hideArrival();
+      arrived = null;
+    }
+    if (options.reducedMotion) {
+      mode = "free";
+      vehicle.place(station.ringAt.x, station.ringAt.z, 0);
+      then();
+      return;
+    }
+    trip = new Trip(planRoute(vehicle.position, station.ringAt, size), vehicle.heading, 0, vehicle.altitude - vehicle.hoverHeight);
+    afterTrip = then;
+    mode = "trip";
+  }
+
+  function cancelTrip() {
+    if (mode !== "trip") return;
+    trip = null;
+    afterTrip = null;
+    mode = "free";
+  }
+
+  function step(direction: number, openDetails: boolean) {
+    if (!arrived) return;
+    goTo(neighbour(arrived, direction), openDetails);
+  }
+
+  // guided tour
+  function startTour() {
+    const stops = TOUR.map((id) => stationById.get(id)).filter((s): s is Station => Boolean(s));
+    if (!stops.length) return;
+    if (view !== "drive") setView("drive");
+    if (vehicle.flying) vehicle.place(vehicle.position.x, vehicle.position.z, vehicle.heading);
+    hints.hide();
+    overlay.closeMenu();
+    tour = { stops, index: 0, hold: 0 };
+    goTourStop(0);
+  }
+
+  function goTourStop(index: number) {
+    if (!tour) return;
+    tour.index = index;
+    tour.hold = 0;
+    const stop = tour.stops[index];
+    overlay.showTour(`Tour ${index + 1} of ${tour.stops.length}: ${stop.name}`);
+    driveTo(stop, () => {
+      arrive(stop);
+      if (tour) tour.hold = index < tour.stops.length - 1 ? TOUR_HOLD : 0;
+    });
+  }
+
+  function stopTour() {
+    if (!tour) return false;
+    tour = null;
+    overlay.showTour(null);
+    cancelTrip();
+    return true;
+  }
+
+  // flying
+  function toggleFly() {
+    if (view !== "drive" || mode !== "free" || introTime < INTRO) return;
+    if (vehicle.flying) {
+      if (!vehicle.land()) overlay.showToast("Find a street to land on.", [{ label: "OK" }], 3);
+    } else {
+      vehicle.takeOff();
+    }
   }
 
   const input = createInput(
     (action) => {
       if (introTime < INTRO) return;
-      if (action === "open" && nearest && !overlay.isOpen) openStation(nearest);
-      if (action === "nextView") setView(view === "drive" ? "spectate" : "drive");
-      if (action === "toggleLook") setLook(LOOKS[(LOOKS.indexOf(look) + 1) % LOOKS.length]);
+      if (action === "open" && nearest && mode === "free" && !vehicle.airborne) arrive(nearest);
+      if (action === "nextView") applyOption(view === "drive" ? "spectate" : "drive");
+      if (action === "toggleLook") applyOption(LOOKS[(LOOKS.indexOf(look) + 1) % LOOKS.length]);
+      if (action === "fly") toggleFly();
     },
     () => running && !root.hidden,
   );
+
+  // a drive key hands control back to the visitor
   input.onDriveKey = () => {
-    if (view === "drive" && overlay.isOpen) closeCard();
+    if (view !== "drive") return;
+    if (tour) stopTour();
+    cancelTrip();
+    if (mode === "arrived") leaveArrival();
   };
 
   for (const [key, pad] of Object.entries(overlay.pads)) {
     const set = (on: boolean) => {
       input.touch[key as keyof typeof input.touch] = on;
       pad.classList.toggle("is-down", on);
-      if (on && overlay.isOpen) closeCard();
+      if (on && ["up", "down", "left", "right"].includes(key)) driveKeyFromTouch();
     };
     pad.addEventListener("pointerdown", (e) => {
       e.preventDefault();
@@ -431,6 +621,61 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
     });
     for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) pad.addEventListener(type, () => set(false));
   }
+  function driveKeyFromTouch() {
+    if (view !== "drive") return;
+    if (tour) stopTour();
+    cancelTrip();
+    if (mode === "arrived") leaveArrival();
+  }
+
+  // spectate: click a building to open it
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  let downAt: { x: number; y: number } | null = null;
+  let glide: { fromPos: THREE.Vector3; toPos: THREE.Vector3; fromTarget: THREE.Vector3; toTarget: THREE.Vector3; t: number } | null = null;
+
+  function pick(event: PointerEvent) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+    raycaster.setFromCamera(pointer, camera);
+    for (const hit of raycaster.intersectObjects(pickables, true)) {
+      let node: THREE.Object3D | null = hit.object;
+      while (node && !node.userData.station) node = node.parent;
+      if (node) return node.userData.station as Station;
+    }
+    return null;
+  }
+
+  function glideTo(station: Station) {
+    const toTarget = station.centre.clone();
+    const away = camera.position.clone().sub(controls.target).setY(0).normalize();
+    if (away.lengthSq() < 0.01) away.set(0, 0, 1);
+    const toPos = toTarget.clone().addScaledVector(away, 70).setY(toTarget.y + 45);
+    glide = { fromPos: camera.position.clone(), toPos, fromTarget: controls.target.clone(), toTarget, t: options.reducedMotion ? 1 : 0 };
+  }
+
+  renderer.domElement.addEventListener("pointerdown", (e) => (downAt = { x: e.clientX, y: e.clientY }));
+  renderer.domElement.addEventListener("pointerup", (e) => {
+    if (!downAt || view !== "spectate" || introTime < INTRO) return;
+    const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
+    downAt = null;
+    if (moved > 8) return;
+    const station = pick(e);
+    if (!station) return;
+    lastInput = performance.now();
+    controls.autoRotate = false;
+    leaveArrival();
+    glideTo(station);
+    arrive(station);
+  });
+  let hoverCheck = 0;
+  renderer.domElement.addEventListener("pointermove", (e) => {
+    if (view !== "spectate" || coarse) return;
+    const now = performance.now();
+    if (now - hoverCheck < 90) return;
+    hoverCheck = now;
+    renderer.domElement.style.cursor = pick(e) ? "pointer" : "";
+  });
 
   // banner videos only play near the camera
   function updateBannerVideos() {
@@ -445,7 +690,6 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
         video.muted = true;
         video.loop = true;
         video.playsInline = true;
-        video.crossOrigin = "anonymous";
         video.src = s.project!.preview;
         s.video = video;
         s.videoTexture = new THREE.VideoTexture(video);
@@ -475,9 +719,6 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
   resizeObserver.observe(container);
   resize();
 
-  // intro: the city rises out of the ground
-  const INTRO = 2.6;
-  let introTime = options.reducedMotion ? INTRO : 0;
   for (const riser of risers) {
     riser.group.scale.y = options.reducedMotion ? 1 : 0.001;
     for (const extra of riser.extras) extra.visible = options.reducedMotion;
@@ -497,16 +738,15 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
 
   function chase(dt: number) {
     vehicle.forward(forward);
-    const parked = nearest && Math.abs(vehicle.speed) < 1.5;
-    if (parked && nearest) {
-      desired.set(nearest.bannerAt.x, 10, nearest.bannerAt.z + 19);
-      desiredLook.copy(nearest.bannerAt);
+    if (mode === "arrived" && arrived) {
+      desired.set(arrived.bannerAt.x, 10, arrived.bannerAt.z + 19);
+      desiredLook.copy(arrived.bannerAt);
     } else {
       const back = 19 + Math.max(0, vehicle.speed) * 0.12;
       desired.copy(vehicle.position).addScaledVector(forward, -back);
-      desired.y = 11;
+      desired.y = vehicle.altitude + 8.6;
       desiredLook.copy(vehicle.position).addScaledVector(forward, 12);
-      desiredLook.y = 5;
+      desiredLook.y = vehicle.altitude + 2.6;
       for (let i = 1; i <= 8; i++) {
         probe.lerpVectors(vehicle.position, desired, i / 8);
         if (blocked(probe)) {
@@ -516,16 +756,25 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
         }
       }
     }
-    const k = 1 - Math.exp(-5 * dt);
+    const k = 1 - Math.exp(-(mode === "trip" ? 7 : 5) * dt);
     camera.position.lerp(desired, k);
     chaseLook.lerp(desiredLook, k);
     camera.lookAt(chaseLook);
   }
 
+  function promptHtml() {
+    if (view !== "drive" || mode !== "free") return null;
+    if (vehicle.flying) {
+      return vehicle.roofBelow() > 0 ? "Flying: <kbd>Space</kbd> up, <kbd>C</kbd> down" : "<kbd>F</kbd> Press F to land";
+    }
+    if (!nearest) return null;
+    return `<kbd>E</kbd> Open ${escapeHtml(nearest.name)}`;
+  }
+
   const clock = new THREE.Clock();
-  let running = false;
   let videoTimer = 0;
   let elapsed = 0;
+  let lastPrompt: string | null = "";
 
   function tick() {
     const dt = Math.min(clock.getDelta(), 0.1);
@@ -540,53 +789,75 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
       }
       camera.position.lerpVectors(introPosition, finalPosition, easeInOut(clamp01(introTime / INTRO)));
       camera.lookAt(lookTarget);
-      if (introTime >= INTRO) {
-        for (const riser of risers) {
-          riser.group.scale.y = 1;
-          for (const extra of riser.extras) extra.visible = true;
-        }
-        carParts.car.visible = true;
-        setView(view);
-      }
+      if (introTime >= INTRO) finishIntro();
     } else {
-      const driving = view === "drive" && !(overlay.isOpen && coarse);
-      vehicle.update(dt, driving ? input.read() : { throttle: 0, steer: 0, boost: false });
+      if (mode === "trip" && trip) {
+        const pose = trip.step(dt);
+        vehicle.pose(pose.x, pose.z, pose.heading, pose.bank, pose.lift, pose.speed);
+        if (trip.done) {
+          const then = afterTrip;
+          trip = null;
+          afterTrip = null;
+          mode = "free";
+          then?.();
+        }
+      } else {
+        const driving = view === "drive" && mode === "free";
+        vehicle.update(dt, driving ? input.read() : { throttle: 0, steer: 0, boost: false, climb: 0 });
+      }
 
       nearest = null;
-      let best = RING_REACH;
-      for (const s of stations) {
-        const d = Math.hypot(vehicle.position.x - s.ringAt.x, vehicle.position.z - s.ringAt.z);
-        if (d < best) {
-          best = d;
-          nearest = s;
+      if (!vehicle.airborne) {
+        let best = RING_REACH;
+        for (const s of stations) {
+          const d = Math.hypot(vehicle.position.x - s.ringAt.x, vehicle.position.z - s.ringAt.z);
+          if (d < best) {
+            best = d;
+            nearest = s;
+          }
         }
       }
-      if (!overlay.isOpen) {
-        const title = nearest ? (nearest.kind === "project" ? nearest.project!.name : nearest.kind === "about" ? "About me" : "Contact") : null;
-        overlay.showPrompt(view === "drive" && title ? `Open ${title}` : null);
+      const prompt = promptHtml();
+      if (prompt !== lastPrompt) {
+        overlay.showPrompt(prompt);
+        lastPrompt = prompt;
+      }
+      root.classList.toggle("is-flying", vehicle.flying);
+
+      if (tour && mode === "arrived" && tour.hold > 0) {
+        tour.hold -= dt;
+        if (tour.hold <= 0) goTourStop(tour.index + 1);
       }
 
       if (view === "drive") chase(dt);
       else {
-        controls.autoRotate = !options.reducedMotion && performance.now() - lastInput > 4000;
+        if (glide) {
+          glide.t = Math.min(1, glide.t + dt / 0.9);
+          const k = easeInOut(glide.t);
+          camera.position.lerpVectors(glide.fromPos, glide.toPos, k);
+          controls.target.lerpVectors(glide.fromTarget, glide.toTarget, k);
+          if (glide.t >= 1) glide = null;
+        }
+        controls.autoRotate = !options.reducedMotion && !glide && mode === "free" && performance.now() - lastInput > 4000;
         controls.update(dt);
       }
-      if (view === "drive") drawMinimap(overlay.minimap, lots, span, lotColors, { x: vehicle.position.x, z: vehicle.position.z, heading: vehicle.heading }, nearest?.lot ?? null);
+      if (overlay.menuOpen) drawMinimap(overlay.minimap, lots, span, lotColors, { x: vehicle.position.x, z: vehicle.position.z, heading: vehicle.heading }, nearest?.lot ?? null);
+      hints.tick(dt, view);
     }
 
     const pulse = options.reducedMotion ? 0.8 : 0.6 + Math.sin(elapsed * 3) * 0.25;
-    for (const s of stations) s.ringMaterial.opacity = s === nearest ? 1 : pulse;
-
-    videoTimer -= dt;
-    if (videoTimer <= 0) {
-      videoTimer = 0.4;
-      updateBannerVideos();
-    }
+    for (const s of stations) s.ringMaterial.opacity = s === nearest || s === arrived ? 1 : pulse;
 
     // labels keep a readable on-screen size: small up close, capped when far away
     for (const sign of signs) {
       const width = THREE.MathUtils.clamp(camera.position.distanceTo(sign.position) * 0.085, 7, 26);
       sign.scale.set(width, width * 0.234, 1);
+    }
+
+    videoTimer -= dt;
+    if (videoTimer <= 0) {
+      videoTimer = 0.4;
+      updateBannerVideos();
     }
 
     scenery.sky.position.copy(camera.position);
@@ -595,8 +866,21 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
       if (plaza) plaza.ring.rotation.z += dt * 0.3;
     }
     if (look === "night") redLight.visible = Math.sin(performance.now() / 400) > -0.2;
+    for (const update of frameListeners) update(dt, elapsed);
 
     renderer.render(scene, camera);
+  }
+  const frameListeners: ((dt: number, elapsed: number) => void)[] = [];
+
+  function finishIntro() {
+    introTime = INTRO;
+    for (const riser of risers) {
+      riser.group.scale.y = 1;
+      for (const extra of riser.extras) extra.visible = true;
+    }
+    carParts.car.visible = true;
+    setView(view);
+    hints.start();
   }
 
   function start() {
@@ -609,7 +893,11 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
   function stop() {
     running = false;
     input.clear();
-    if (overlay.hideCard()) current = null;
+    stopTour();
+    cancelTrip();
+    leaveArrival();
+    overlay.closeMenu();
+    hints.hide();
     renderer.setAnimationLoop(null);
     for (const s of stations) s.video?.pause();
   }
@@ -622,24 +910,39 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
     }
   });
 
+  setLook("day");
   setView("drive");
 
   return {
     start,
     stop,
-    handleEscape: closeCard,
-    focusProject(id: string) {
-      const station = stations.find((s) => s.project?.id === id);
-      if (!station) return false;
-      introTime = INTRO;
-      for (const riser of risers) {
-        riser.group.scale.y = 1;
-        for (const extra of riser.extras) extra.visible = true;
+    handleEscape() {
+      if (overlay.menuOpen) {
+        overlay.closeMenu();
+        overlay.focusMenu();
+        return true;
       }
-      carParts.car.visible = true;
+      if (overlay.hintOpen) {
+        hints.hide();
+        return true;
+      }
+      if (closePanel()) return true;
+      if (leaveArrival()) return true;
+      if (stopTour()) return true;
+      if (mode === "trip") {
+        cancelTrip();
+        return true;
+      }
+      return false;
+    },
+    focusProject(id: string) {
+      const station = stationById.get(id);
+      if (!station) return false;
+      if (introTime < INTRO) finishIntro();
       setView("drive");
-      parkAt(station);
-      openStation(station);
+      vehicle.place(station.ringAt.x, station.ringAt.z, 0);
+      camera.position.set(station.bannerAt.x, 10, station.bannerAt.z + 19);
+      arrive(station, true);
       return true;
     },
   };

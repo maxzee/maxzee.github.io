@@ -13,7 +13,9 @@ export interface SiteProject {
   summary: string;
   tags: string[];
   built: string[];
+  stack: [string, string][];
   featured: boolean;
+  district: "team" | "unreal" | "mobile" | "sim";
   preview: string;
   poster: string;
 }
@@ -223,22 +225,8 @@ export function renderSimple(projects: SiteProject[], profile: SiteProfile) {
 
   const footer = `<footer class="footer"><p>© ${new Date().getFullYear()} ${esc(profile.name)} · Built with Vite and TypeScript</p></footer>`;
 
-  const city = `<section class="city" id="city" aria-label="3D city" hidden>
+  const city = `<section class="city" id="city" aria-label="3D city" tabindex="-1" hidden>
     <div class="city-canvas" data-city-canvas></div>
-    <header class="city-bar">
-      <p class="city-brand"><span class="brand-mark" aria-hidden="true">M</span>${esc(profile.name)}</p>
-      <div class="segmented" role="group" aria-label="View">
-        <button type="button" aria-pressed="true" data-view="drive">Drive</button>
-        <button type="button" aria-pressed="false" data-view="spectate">Spectate</button>
-        <button type="button" aria-pressed="false" data-close-city>Simple</button>
-      </div>
-      <div class="segmented" role="group" aria-label="Look">
-        <button type="button" aria-pressed="true" data-look="day">Day</button>
-        <button type="button" aria-pressed="false" data-look="night">Night</button>
-        <button type="button" aria-pressed="false" data-look="blueprint">Blueprint</button>
-      </div>
-    </header>
-    <p class="city-hint" data-city-hint>W A S D to drive · E open</p>
     <div class="city-loading" data-city-loading role="status">
       <p class="city-loading-name">${esc(profile.name)}</p>
       <p class="city-loading-text">Building the city…</p>

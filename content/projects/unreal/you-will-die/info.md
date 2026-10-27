@@ -25,5 +25,13 @@ built:
 visibility: 'yes'
 media:
   video: media/Zombie AI.mp4
+stack:
+  - - AI
+    - 'Behavior Trees, AI Perception and EQS'
+  - - Gameplay
+    - 'Chase, attack and door logic in C++'
+  - - Animation
+    - 'Montages, hit reactions and ragdoll'
+district: unreal
 ---
 

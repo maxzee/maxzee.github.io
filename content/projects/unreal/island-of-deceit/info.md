@@ -25,5 +25,13 @@ built:
 visibility: 'yes'
 media:
   video: media/IslandOfDeceit.mp4
+stack:
+  - - Network
+    - Steam sessions for up to 10 players
+  - - Gameplay
+    - 'Pirate and Traitor roles, repair and sabotage'
+  - - UI
+    - Inventory with drag and drop
+district: unreal
 ---
 

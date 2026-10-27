@@ -9,11 +9,17 @@ const BOOST_ACCEL = 60;
 const BRAKE = 70;
 const TURN_RATE = 2.1;
 const RADIUS = 2.2;
+const FLY_START = 28;
+const FLY_MIN = 6;
+const FLY_MAX = 90;
+const CLIMB_RATE = 9;
+const FLY_SPEED_BONUS = 1.3;
 
 export interface DriveInput {
   throttle: number;
   steer: number;
   boost: boolean;
+  climb: number;
 }
 
 export interface Collider {
@@ -87,6 +93,11 @@ export class Vehicle {
   heading = 0;
   speed = 0;
   steerSmoothed = 0;
+  altitude = HOVER_HEIGHT;
+  flying = false;
+  private landing = false;
+  private targetAltitude = HOVER_HEIGHT;
+  private climbRate = 0;
   private bob = 0;
 
   constructor(
@@ -96,22 +107,70 @@ export class Vehicle {
     private readonly reducedMotion: boolean,
   ) {}
 
+  readonly hoverHeight = HOVER_HEIGHT;
+
+  get airborne() {
+    return this.altitude > HOVER_HEIGHT + 0.5;
+  }
+
   forward(out = new THREE.Vector3()) {
     return out.set(-Math.sin(this.heading), 0, -Math.cos(this.heading));
+  }
+
+  roofBelow() {
+    const p = this.position;
+    let top = 0;
+    for (const c of this.colliders) {
+      if (p.x > c.minX && p.x < c.maxX && p.z > c.minZ && p.z < c.maxZ) top = Math.max(top, c.top);
+    }
+    return top;
   }
 
   place(x: number, z: number, heading: number) {
     this.position.set(x, HOVER_HEIGHT, z);
     this.heading = heading;
     this.speed = 0;
+    this.flying = this.landing = false;
+    this.altitude = this.targetAltitude = HOVER_HEIGHT;
     this.sync();
   }
 
+  // scripted pose used by street trips and the tour
+  pose(x: number, z: number, heading: number, bank: number, lift: number, speed: number) {
+    this.position.set(x, HOVER_HEIGHT, z);
+    this.heading = heading;
+    this.speed = speed;
+    this.steerSmoothed = bank;
+    this.flying = this.landing = false;
+    this.altitude = this.targetAltitude = HOVER_HEIGHT + lift;
+    this.bob += 0.016;
+    this.sync();
+  }
+
+  takeOff() {
+    if (this.flying) return;
+    this.flying = true;
+    this.landing = false;
+    this.targetAltitude = Math.max(FLY_START, this.roofBelow() + 4);
+    if (Math.abs(this.speed) < 3) this.speed = 6;
+  }
+
+  // false when there's a roof underneath
+  land() {
+    if (!this.flying) return true;
+    if (this.roofBelow() > 0) return false;
+    this.landing = true;
+    this.targetAltitude = HOVER_HEIGHT;
+    if (Math.abs(this.speed) < 3) this.speed = 5;
+    return true;
+  }
+
   update(dt: number, input: DriveInput) {
-    const top = input.boost ? BOOST_SPEED : MAX_SPEED;
+    const bonus = this.flying && !this.landing ? FLY_SPEED_BONUS : 1;
+    const top = (input.boost ? BOOST_SPEED : MAX_SPEED) * bonus;
 
     if (input.throttle > 0) {
-      const accel = input.boost ? BOOST_ACCEL : ACCEL;
+      const accel = (input.boost ? BOOST_ACCEL : ACCEL) * bonus;
       this.speed = this.speed < 0 ? this.speed + BRAKE * dt : Math.min(top, this.speed + accel * dt);
       if (this.speed > top) this.speed = Math.max(top, this.speed - BRAKE * dt);
     } else if (input.throttle < 0) {
@@ -123,10 +182,27 @@ export class Vehicle {
 
     const grip = Math.min(1, Math.abs(this.speed) / 8);
     this.heading += input.steer * TURN_RATE * grip * Math.sign(this.speed || 1) * dt;
-    this.steerSmoothed += (input.steer * grip - this.steerSmoothed) * Math.min(1, dt * 6);
+    const bankScale = this.flying ? 1.5 : 1;
+    this.steerSmoothed += (input.steer * grip * bankScale - this.steerSmoothed) * Math.min(1, dt * 6);
 
-    const forward = this.forward();
-    this.position.addScaledVector(forward, this.speed * dt);
+    this.position.addScaledVector(this.forward(), this.speed * dt);
+
+    if (this.flying) {
+      if (!this.landing) this.targetAltitude = THREE.MathUtils.clamp(this.targetAltitude + input.climb * CLIMB_RATE * dt, FLY_MIN, FLY_MAX);
+      // never descend into a roof
+      this.targetAltitude = Math.max(this.targetAltitude, this.roofBelow() + 3);
+      const delta = THREE.MathUtils.clamp(this.targetAltitude - this.altitude, -CLIMB_RATE * dt, CLIMB_RATE * dt);
+      this.climbRate = delta / Math.max(dt, 0.0001);
+      this.altitude += delta;
+      if (this.landing && this.altitude <= HOVER_HEIGHT + 0.05) {
+        this.altitude = HOVER_HEIGHT;
+        this.flying = this.landing = false;
+        this.climbRate = 0;
+      }
+    } else {
+      this.climbRate = 0;
+    }
+
     this.resolveCollisions();
     this.bob += dt;
     this.sync();
@@ -135,6 +211,8 @@ export class Vehicle {
   private resolveCollisions() {
     const p = this.position;
     for (const c of this.colliders) {
+      // while flying, only things taller than the car block it
+      if (c.top < this.altitude - 1) continue;
       const nx = THREE.MathUtils.clamp(p.x, c.minX, c.maxX);
       const nz = THREE.MathUtils.clamp(p.z, c.minZ, c.maxZ);
       const dx = p.x - nx;
@@ -158,11 +236,18 @@ export class Vehicle {
   }
 
   private sync() {
-    const { car, body } = this.parts;
+    const { car, body, underglow } = this.parts;
     const hover = this.reducedMotion ? 0 : Math.sin(this.bob * 2.2) * 0.15;
-    car.position.set(this.position.x, HOVER_HEIGHT + hover, this.position.z);
+    this.position.y = this.altitude;
+    car.position.set(this.position.x, this.altitude + hover, this.position.z);
     car.rotation.y = this.heading;
-    body.rotation.z = this.reducedMotion ? 0 : this.steerSmoothed * 0.28;
-    body.rotation.x = this.reducedMotion ? 0 : THREE.MathUtils.clamp(this.speed / 400, -0.06, 0.1);
+    underglow.visible = !this.airborne;
+    if (this.reducedMotion) {
+      body.rotation.set(0, 0, 0);
+      return;
+    }
+    body.rotation.z = this.steerSmoothed * 0.28;
+    const accelPitch = THREE.MathUtils.clamp(this.speed / 400, -0.06, 0.1);
+    body.rotation.x = accelPitch + THREE.MathUtils.clamp(this.climbRate / 40, -0.22, 0.22);
   }
 }

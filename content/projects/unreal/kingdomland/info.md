@@ -28,5 +28,15 @@ featured: true
 order: 2
 media:
   video: media/KingdomLand_Portfolio_Showcase (1).mp4
+stack:
+  - - UI
+    - 'Start screen, menus and video background'
+  - - Characters
+    - 'Customizer, equipment and save flow'
+  - - World
+    - Grid-based plot loading with instanced meshes
+  - - Backend
+    - 'REST APIs for items, plots and profiles'
+district: team
 ---
 

@@ -27,5 +27,15 @@ media:
   video: >-
     media/Enterprise Metaverse Development – Orion Platform (Unity, WebGL,
     Web3).mp4
+stack:
+  - - Client
+    - WebGL build tuned for browsers
+  - - Gameplay
+    - Unity C# world systems
+  - - Network
+    - Socket real-time sync
+  - - Data
+    - MongoDB and blockchain integration
+district: mobile
 ---
 
