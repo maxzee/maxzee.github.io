@@ -6,11 +6,13 @@
   "scripts": {
     "content": "tsx scripts/build-content.ts",
     "prerender": "tsx scripts/prerender.ts",
+    "media": "tsx scripts/build-media.ts",
     "dev": "npm run content && npm run prerender && vite",
     "build": "npm run content && npm run prerender && tsc --noEmit && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-mono": "5.3.0",
     "@fontsource/rajdhani": "5.3.0",
     "@fontsource/russo-one": "5.3.0",
     "gray-matter": "4.0.3",

@@ -1,15 +1,19 @@
 ---
 id: tamr
 name: Tamr
-engines: [unity]
-engineLabel: "Unity"
-platform: ""
-company: ""
-year: ""
+engines:
+  - unity
+engineLabel: Unity
+platform: ''
+company: ''
+year: ''
 status: released
-role: "Senior developer"
-summary: ""
+role: Senior developer
+summary: ''
 tags: []
 built: []
-visibility: yes
+visibility: 'yes'
+media:
+  video: media/Tamr.mp4
 ---
+

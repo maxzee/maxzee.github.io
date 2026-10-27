@@ -1,19 +1,23 @@
 ---
 id: nayzak
 name: NAYZAK
-engines: [other]
+engines:
+  - other
 engineLabel: AI video creation
 platform: Video
-company: ""
-year: ""
+company: ''
+year: ''
 status: prototype
 role: Lead art direction
 summary: AI-generated video demo. No playable game has been built behind it.
-tags: [AI video, Art direction]
+tags:
+  - AI video
+  - Art direction
 built: []
 media:
   video: media/NAYZAK_Concept_Demo (1).mp4
-visibility: yes
+visibility: 'yes'
 featured: true
 order: 1
 ---
+
