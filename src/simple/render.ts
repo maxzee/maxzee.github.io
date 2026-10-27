@@ -227,14 +227,18 @@ export function renderSimple(projects: SiteProject[], profile: SiteProfile) {
     <div class="city-canvas" data-city-canvas></div>
     <header class="city-bar">
       <p class="city-brand"><span class="brand-mark" aria-hidden="true">M</span>${esc(profile.name)}</p>
+      <div class="segmented" role="group" aria-label="View">
+        <button type="button" aria-pressed="true" data-view="drive">Drive</button>
+        <button type="button" aria-pressed="false" data-view="spectate">Spectate</button>
+        <button type="button" aria-pressed="false" data-close-city>Simple</button>
+      </div>
       <div class="segmented" role="group" aria-label="Look">
         <button type="button" aria-pressed="true" data-look="day">Day</button>
         <button type="button" aria-pressed="false" data-look="night">Night</button>
         <button type="button" aria-pressed="false" data-look="blueprint">Blueprint</button>
       </div>
-      <button type="button" class="btn btn-ghost city-close" data-close-city>Back to site</button>
     </header>
-    <p class="city-hint">Drag to orbit · scroll or pinch to zoom</p>
+    <p class="city-hint" data-city-hint>W A S D to drive · E open</p>
     <div class="city-loading" data-city-loading role="status">
       <p class="city-loading-name">${esc(profile.name)}</p>
       <p class="city-loading-text">Building the city…</p>

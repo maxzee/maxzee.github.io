@@ -111,14 +111,12 @@ if (reel && !reducedMotion) {
 // 3D city, loaded only when a visitor asks for it
 type CityModule = typeof import("./world/app");
 type CityHandle = Awaited<ReturnType<CityModule["createCity"]>>;
-type Look = Parameters<CityHandle["setLook"]>[0];
 
 const cityEl = document.getElementById("city");
-const cityCanvas = document.querySelector<HTMLElement>("[data-city-canvas]");
 const cityLoading = document.querySelector<HTMLElement>("[data-city-loading]");
-const lookButtons = document.querySelectorAll<HTMLButtonElement>("[data-look]");
 const openButtons = document.querySelectorAll<HTMLButtonElement>("[data-open-city]");
 let city: Promise<CityHandle> | null = null;
+let cityHandle: CityHandle | null = null;
 let cityOpen = false;
 let opener: HTMLElement | null = null;
 
@@ -138,27 +136,22 @@ if (!webgl) {
   });
 }
 
-function setLookButtons(look: Look) {
-  lookButtons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.look === look)));
-}
-
-async function openCity(trigger?: HTMLElement) {
-  if (!webgl || !cityEl || !cityCanvas || cityOpen) return;
+async function openCity(trigger?: HTMLElement, projectId?: string) {
+  if (!webgl || !cityEl || cityOpen) return;
   cityOpen = true;
   opener = trigger ?? null;
   cityEl.hidden = false;
   document.documentElement.classList.add("city-open");
-  history.replaceState(null, "", "#city");
+  if (!projectId) history.replaceState(null, "", "#city");
   reel?.pause();
-  cityEl.querySelector<HTMLButtonElement>("[data-close-city]")?.focus();
+  cityEl.querySelector<HTMLButtonElement>('[data-view="drive"]')?.focus();
 
-  if (!city) {
-    city = import("./world/app").then((module) => module.createCity(cityCanvas, { reducedMotion }));
-    setLookButtons("day");
-  }
+  city ??= import("./world/app").then((module) => module.createCity(cityEl, { reducedMotion }));
   try {
     const handle = await city;
+    cityHandle = handle;
     if (cityLoading) cityLoading.hidden = true;
+    if (projectId && !handle.focusProject(projectId)) history.replaceState(null, "", "#city");
     if (cityOpen) handle.start();
   } catch (error) {
     console.error(error);
@@ -180,14 +173,12 @@ function closeCity() {
 openButtons.forEach((button) => button.addEventListener("click", () => openCity(button)));
 document.querySelector("[data-close-city]")?.addEventListener("click", closeCity);
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && cityOpen) closeCity();
-});
-lookButtons.forEach((button) => {
-  button.addEventListener("click", async () => {
-    const look = button.dataset.look as Look;
-    setLookButtons(look);
-    (await city)?.setLook(look);
-  });
+  if (event.key !== "Escape" || !cityOpen) return;
+  if (cityHandle?.handleEscape()) return;
+  closeCity();
 });
 
-if (location.hash === "#city") openCity();
+// share links: #city opens the city, #<project-id> opens that project in Drive
+const hash = location.hash.slice(1);
+if (hash === "city") openCity();
+else if (/^[a-z0-9-]+$/.test(hash) && hash !== "simple") openCity(undefined, hash);
