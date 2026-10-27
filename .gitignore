@@ -1,0 +1,8 @@
+node_modules
+dist
+src/generated
+
+**/docs/
+*.mp4
+*.webm
+*.mkv
