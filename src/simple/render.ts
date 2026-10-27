@@ -126,6 +126,7 @@ export function renderSimple(projects: SiteProject[], profile: SiteProfile) {
         <button type="button" data-scroll="projects">All projects</button>
         <button type="button" data-scroll="experience">Experience</button>
         <button type="button" data-scroll="skills">Skills</button>
+        <button type="button" class="nav-city" data-open-city>3D city</button>
         <button type="button" class="nav-cta" data-scroll="contact">Contact</button>
       </nav>
     </div>
@@ -139,8 +140,8 @@ export function renderSimple(projects: SiteProject[], profile: SiteProfile) {
       <h1>I build game worlds in <span class="eng eng-unity">Unity</span> and <span class="eng eng-unreal">Unreal</span>, then make them run fast.</h1>
       <p class="intro">${esc(profile.bio)}</p>
       <div class="cta-row">
-        <button type="button" class="btn btn-primary" data-scroll="featured">See my work</button>
-        <button type="button" class="btn btn-ghost" data-scroll="contact">Get in touch</button>
+        <button type="button" class="btn btn-primary" data-open-city>Enter the 3D city</button>
+        <button type="button" class="btn btn-ghost" data-scroll="featured">See my work</button>
       </div>
     </div>
     <dl class="hud">
@@ -222,5 +223,23 @@ export function renderSimple(projects: SiteProject[], profile: SiteProfile) {
 
   const footer = `<footer class="footer"><p>© ${new Date().getFullYear()} ${esc(profile.name)} · Built with Vite and TypeScript</p></footer>`;
 
-  return [nav, `<main class="page">`, hero, selected, allProjects, experienceSection, skills, contact, `</main>`, footer].join("\n");
+  const city = `<section class="city" id="city" aria-label="3D city" hidden>
+    <div class="city-canvas" data-city-canvas></div>
+    <header class="city-bar">
+      <p class="city-brand"><span class="brand-mark" aria-hidden="true">M</span>${esc(profile.name)}</p>
+      <div class="segmented" role="group" aria-label="Look">
+        <button type="button" aria-pressed="true" data-look="day">Day</button>
+        <button type="button" aria-pressed="false" data-look="night">Night</button>
+        <button type="button" aria-pressed="false" data-look="blueprint">Blueprint</button>
+      </div>
+      <button type="button" class="btn btn-ghost city-close" data-close-city>Back to site</button>
+    </header>
+    <p class="city-hint">Drag to orbit · scroll or pinch to zoom</p>
+    <div class="city-loading" data-city-loading role="status">
+      <p class="city-loading-name">${esc(profile.name)}</p>
+      <p class="city-loading-text">Building the city…</p>
+    </div>
+  </section>`;
+
+  return [nav, `<main class="page">`, hero, selected, allProjects, experienceSection, skills, contact, `</main>`, footer, city].join("\n");
 }

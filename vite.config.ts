@@ -5,5 +5,7 @@ export default defineConfig({
   build: {
     outDir: "dist",
     target: "es2022",
+    // three.js lives in its own lazily loaded chunk
+    chunkSizeWarningLimit: 700,
   },
 });

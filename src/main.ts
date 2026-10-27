@@ -89,7 +89,9 @@ if (!finePointer) document.querySelectorAll<HTMLVideoElement>("[data-card-video]
 // hero reel: cycles through every project preview
 const reel = document.querySelector<HTMLVideoElement>("[data-reel]");
 const reelName = document.querySelector<HTMLElement>("[data-reel-name]");
+let reelActive = false;
 if (reel && !reducedMotion) {
+  reelActive = true;
   const clips = JSON.parse(reel.dataset.reel ?? "[]") as { src: string; name: string }[];
   let current = 0;
   const load = (i: number) => {
@@ -99,6 +101,93 @@ if (reel && !reducedMotion) {
     play(reel);
   };
   reel.addEventListener("ended", () => load(current + 1));
-  document.addEventListener("visibilitychange", () => (document.hidden ? reel.pause() : reel.play().catch(() => {})));
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden || cityOpen) reel.pause();
+    else reel.play().catch(() => {});
+  });
   if (clips.length) load(0);
 }
+
+// 3D city, loaded only when a visitor asks for it
+type CityModule = typeof import("./world/app");
+type CityHandle = Awaited<ReturnType<CityModule["createCity"]>>;
+type Look = Parameters<CityHandle["setLook"]>[0];
+
+const cityEl = document.getElementById("city");
+const cityCanvas = document.querySelector<HTMLElement>("[data-city-canvas]");
+const cityLoading = document.querySelector<HTMLElement>("[data-city-loading]");
+const lookButtons = document.querySelectorAll<HTMLButtonElement>("[data-look]");
+const openButtons = document.querySelectorAll<HTMLButtonElement>("[data-open-city]");
+let city: Promise<CityHandle> | null = null;
+let cityOpen = false;
+let opener: HTMLElement | null = null;
+
+function hasWebGL() {
+  try {
+    return Boolean(document.createElement("canvas").getContext("webgl2"));
+  } catch {
+    return false;
+  }
+}
+
+const webgl = hasWebGL();
+if (!webgl) {
+  openButtons.forEach((button) => {
+    button.disabled = true;
+    button.title = "Your browser can't show the 3D city (WebGL is unavailable).";
+  });
+}
+
+function setLookButtons(look: Look) {
+  lookButtons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.look === look)));
+}
+
+async function openCity(trigger?: HTMLElement) {
+  if (!webgl || !cityEl || !cityCanvas || cityOpen) return;
+  cityOpen = true;
+  opener = trigger ?? null;
+  cityEl.hidden = false;
+  document.documentElement.classList.add("city-open");
+  history.replaceState(null, "", "#city");
+  reel?.pause();
+  cityEl.querySelector<HTMLButtonElement>("[data-close-city]")?.focus();
+
+  if (!city) {
+    city = import("./world/app").then((module) => module.createCity(cityCanvas, { reducedMotion }));
+    setLookButtons("day");
+  }
+  try {
+    const handle = await city;
+    if (cityLoading) cityLoading.hidden = true;
+    if (cityOpen) handle.start();
+  } catch (error) {
+    console.error(error);
+    if (cityLoading) cityLoading.querySelector(".city-loading-text")!.textContent = "The 3D city couldn't load on this device.";
+  }
+}
+
+function closeCity() {
+  if (!cityEl || !cityOpen) return;
+  cityOpen = false;
+  cityEl.hidden = true;
+  document.documentElement.classList.remove("city-open");
+  history.replaceState(null, "", location.pathname + location.search);
+  city?.then((handle) => handle.stop());
+  if (reelActive) reel?.play().catch(() => {});
+  opener?.focus();
+}
+
+openButtons.forEach((button) => button.addEventListener("click", () => openCity(button)));
+document.querySelector("[data-close-city]")?.addEventListener("click", closeCity);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && cityOpen) closeCity();
+});
+lookButtons.forEach((button) => {
+  button.addEventListener("click", async () => {
+    const look = button.dataset.look as Look;
+    setLookButtons(look);
+    (await city)?.setLook(look);
+  });
+});
+
+if (location.hash === "#city") openCity();
