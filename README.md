@@ -80,5 +80,5 @@ scripts/         content build, prerender and media scripts
 src/simple/      the 1-page site renderer (runs at build time)
 src/world/       the 3D city (lazy-loaded)
 src/styles/      tokens, page styles, city styles
-reference/       original build spec and prototype
+reference/       original build spec and prototype (kept locally, not committed)
 ```
