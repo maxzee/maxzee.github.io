@@ -10,6 +10,10 @@ import { layoutCity, PLOT, type Lot } from "./layout";
 import { applyMaterialLook, createMaterials, ENGINE_HEX, type AccentKey, type Look, type Materials } from "./materials";
 import { planRoute, Trip } from "./route";
 import { buildPlaza, buildScenery } from "./scenery";
+import { buildStreetSigns, buildWelcome } from "./landmarks";
+import { buildWaterfront } from "./waterfront";
+import { buildCharacters, buildPedestrians } from "./characters";
+import { buildTraffic } from "./traffic";
 import { groundTextTexture, infoBoardTexture, labelTexture, nameplateTexture, slateTexture } from "./textures";
 import { createOverlay, drawMinimap, type ActionButton, type Option } from "./ui";
 import { buildHoverCar, Vehicle, type Collider } from "./vehicle";
@@ -140,10 +144,11 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, 1, 1, 2400);
   const m = createMaterials();
-  const { lots, size, span } = layoutCity(projects);
+  const { lots, size, span, districtStarts } = layoutCity(projects);
 
   const scenery = buildScenery(lots, size, span);
-  scene.add(scenery.group, scenery.sky);
+  const waterfront = buildWaterfront(span, lowPower);
+  scene.add(scenery.group, scenery.sky, waterfront.group);
 
   const hemi = new THREE.HemisphereLight(0xbfddf5, 0xd8b98a, 1.1);
   const sun = new THREE.DirectionalLight(0xfff1d6, 2.2);
@@ -282,9 +287,29 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
     lotColors.set(lot, css(color));
   }
 
+  scene.add(buildStreetSigns(districtStarts, colliders));
+  const welcome = buildWelcome(
+    plazaLot,
+    {
+      title: profile.name.toUpperCase(),
+      detail: `Game Developer, Unity and Unreal · ${profile.yearsExperience}+ years · ${projects.length} projects`,
+      call: "Drive to a glowing ring, or press Take the tour.",
+    },
+    colliders,
+  );
+  scene.add(welcome.group, welcome.paint);
+  risers.push({ group: welcome.group, extras: [welcome.paint], delay: 0.1 });
+
   // projects first, in grid order, then About and Contact
   stations.sort((a, b) => (a.kind === "project" ? 0 : 1) - (b.kind === "project" ? 0 : 1) || a.lot.index - b.lot.index);
   const stationById = new Map(stations.map((s) => [s.id, s]));
+
+  const characters = buildCharacters(
+    stations.filter((s) => s.kind === "project").map((s) => ({ lot: s.lot, id: s.id, name: s.name, color: s.color })),
+  );
+  const pedestrians = buildPedestrians(lots);
+  const traffic = buildTraffic(size);
+  scene.add(characters.group, pedestrians.group, traffic.group);
 
   const blueprintEdges: THREE.Object3D[] = [];
   scene.traverse((o) => o.userData.blueprintEdge && blueprintEdges.push(o));
@@ -349,6 +374,11 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
     applyMaterialLook(m, next);
     scenery.applyLook(next);
     plaza?.applyLook(next);
+    welcome.applyLook(next);
+    waterfront.applyLook(next);
+    characters.applyLook(next);
+    pedestrians.applyLook(next);
+    traffic.applyLook(next);
     for (const edge of blueprintEdges) edge.visible = bp;
     redLight.visible = night;
     carParts.light.intensity = night ? 3 : 0;
@@ -866,11 +896,14 @@ export async function createCity(root: HTMLElement, options: { reducedMotion: bo
       if (plaza) plaza.ring.rotation.z += dt * 0.3;
     }
     if (look === "night") redLight.visible = Math.sin(performance.now() / 400) > -0.2;
-    for (const update of frameListeners) update(dt, elapsed);
+    waterfront.update(elapsed, options.reducedMotion);
+    const greet = arrived?.id ?? (nearest && Math.abs(vehicle.speed) < 1.5 ? nearest.id : null);
+    characters.update(dt, elapsed, vehicle.position, greet, options.reducedMotion);
+    pedestrians.update(dt, elapsed, options.reducedMotion);
+    traffic.update(dt, options.reducedMotion);
 
     renderer.render(scene, camera);
   }
-  const frameListeners: ((dt: number, elapsed: number) => void)[] = [];
 
   function finishIntro() {
     introTime = INTRO;

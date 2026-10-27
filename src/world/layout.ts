@@ -3,8 +3,18 @@ import type { SiteProject } from "../simple/render";
 export const PITCH = 46;
 export const PLOT = 32;
 export const FOOTPRINT = 22;
+export const LAND_MARGIN = 36;
 
 export type Style = "tower" | "midrise" | "mall" | "courtyard" | "stepped";
+export type District = SiteProject["district"];
+
+export const DISTRICTS: District[] = ["team", "unreal", "mobile", "sim"];
+export const DISTRICT_NAME: Record<District, string> = {
+  team: "Team projects",
+  unreal: "Unreal and personal",
+  mobile: "Mobile and web",
+  sim: "Sim street",
+};
 export type LotKind = "project" | "about" | "contact" | "plaza" | "park";
 
 export interface Lot {
@@ -66,18 +76,25 @@ export function layoutCity(projects: SiteProject[]) {
   const aboutCell = byPlazaDistance[0];
   const contactCell = byPlazaDistance[1];
 
-  // featured projects take the back-centre so they read as the skyline
-  const projectCells = remaining
-    .filter((c) => c !== aboutCell && c !== contactCell)
-    .sort((a, b) => a.row - b.row || Math.abs(a.col - centre) - Math.abs(b.col - centre));
+  // districts fill the city from the back, row by row; featured projects lead their district
+  const projectCells = remaining.filter((c) => c !== aboutCell && c !== contactCell).sort((a, b) => a.row - b.row || a.col - b.col);
 
-  const ordered = [...projects].sort((a, b) => Number(b.featured) - Number(a.featured));
+  const ordered = [...projects].sort(
+    (a, b) =>
+      DISTRICTS.indexOf(a.district) - DISTRICTS.indexOf(b.district) ||
+      Number(b.featured) - Number(a.featured) ||
+      (a.order ?? 999) - (b.order ?? 999) ||
+      a.name.localeCompare(b.name),
+  );
   const lots: Lot[] = [];
+  const districtStarts: { district: District; lot: Lot }[] = [];
 
   ordered.forEach((project, i) => {
     const cell = projectCells[i];
     const height = heightFor(project);
-    lots.push({ kind: "project", index: lots.length, ...cell, project, height, style: styleFor(project, height) });
+    const lot: Lot = { kind: "project", index: lots.length, ...cell, project, height, style: styleFor(project, height) };
+    lots.push(lot);
+    if (!districtStarts.some((d) => d.district === project.district)) districtStarts.push({ district: project.district, lot });
   });
 
   lots.push({ kind: "about", index: lots.length, ...aboutCell, height: 16, style: "midrise" });
@@ -87,5 +104,5 @@ export function layoutCity(projects: SiteProject[]) {
     lots.push({ kind: "park", index: lots.length, ...cell, height: 0, style: "midrise" });
   }
 
-  return { lots, size, span: size * PITCH };
+  return { lots, size, span: size * PITCH, districtStarts };
 }

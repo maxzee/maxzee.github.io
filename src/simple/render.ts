@@ -16,6 +16,7 @@ export interface SiteProject {
   stack: [string, string][];
   featured: boolean;
   district: "team" | "unreal" | "mobile" | "sim";
+  order?: number;
   preview: string;
   poster: string;
 }

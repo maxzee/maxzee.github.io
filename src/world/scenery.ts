@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { hash, PITCH, PLOT, type Lot } from "./layout";
+import { hash, LAND_MARGIN, PITCH, PLOT, type Lot } from "./layout";
 import type { Look } from "./materials";
 import { groundTextTexture } from "./textures";
 
@@ -136,7 +136,9 @@ export function buildScenery(lots: Lot[], size: number, span: number) {
   const starField = stars();
   const cloudLayer = clouds();
 
-  const ground = new THREE.Mesh(flat(new THREE.PlaneGeometry(2400, 2400)), new THREE.MeshStandardMaterial({ color: GROUND.day, roughness: 1 }));
+  const landSize = (span / 2 + LAND_MARGIN) * 2;
+  const ground = new THREE.Mesh(new THREE.BoxGeometry(landSize, 6, landSize), new THREE.MeshStandardMaterial({ color: GROUND.day, roughness: 1 }));
+  ground.position.y = -3;
   ground.receiveShadow = true;
 
   const asphalt = new THREE.Mesh(
