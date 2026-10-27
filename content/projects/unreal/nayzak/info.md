@@ -1,7 +1,7 @@
 ---
 id: nayzak
 name: NAYZAK
-engine: other
+engines: [other]
 engineLabel: AI video creation
 platform: Video
 company: ""
@@ -13,7 +13,7 @@ tags: [AI video, Art direction]
 built: []
 media:
   video: media/NAYZAK_Concept_Demo (1).mp4
-visibility: pending
+visibility: yes
 featured: true
 order: 1
 ---

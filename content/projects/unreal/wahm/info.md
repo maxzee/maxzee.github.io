@@ -1,7 +1,7 @@
 ---
 id: wahm
 name: WAHM
-engine: unreal
+engines: [unreal]
 engineLabel: Unreal Engine
 platform: PC
 company: ""

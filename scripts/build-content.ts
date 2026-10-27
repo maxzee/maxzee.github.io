@@ -12,7 +12,7 @@ const MAX_VIDEO_BYTES = 8 * 1024 * 1024;
 const projectSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/, "id must be lowercase letters, numbers and hyphens"),
   name: z.string().min(1),
-  engine: z.enum(["unity", "unreal", "other"]),
+  engines: z.array(z.enum(["unity", "unreal", "other"])).min(1),
   engineLabel: z.string().default(""),
   platform: z.string().default(""),
   company: z.string().default(""),
@@ -49,6 +49,13 @@ const profileSchema = z.object({
   github: z.string().default(""),
   linkedin: z.string().default(""),
   yearsExperience: z.number().default(0),
+  education: z
+    .array(z.object({ degree: z.string(), school: z.string(), period: z.string() }))
+    .default([]),
+  experience: z
+    .array(z.object({ role: z.string(), company: z.string(), period: z.string(), bullets: z.array(z.string()) }))
+    .default([]),
+  expertise: z.array(z.object({ title: z.string(), bullets: z.array(z.string()) })).default([]),
 });
 
 function readFrontmatter(file: string) {

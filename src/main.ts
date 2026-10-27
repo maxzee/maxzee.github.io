@@ -1,21 +1,33 @@
+import "@fontsource/russo-one/400.css";
+import "@fontsource/rajdhani/500.css";
+import "@fontsource/rajdhani/700.css";
 import "./styles/tokens.css";
-import projects from "./generated/projects.json";
-import profile from "./generated/profile.json";
+import "./styles/simple.css";
 
-const app = document.querySelector<HTMLElement>("#app");
-if (!app) throw new Error("#app missing");
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-const header = document.createElement("h1");
-header.textContent = profile.name;
+document.querySelectorAll<HTMLButtonElement>("[data-scroll]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const target = document.getElementById(button.dataset.scroll ?? "");
+    target?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+  });
+});
 
-const title = document.createElement("p");
-title.textContent = profile.title;
+const filterButtons = document.querySelectorAll<HTMLButtonElement>("[data-filter]");
+const cards = document.querySelectorAll<HTMLElement>("[data-filter-grid] .card");
 
-const list = document.createElement("ul");
-for (const project of projects) {
-  const item = document.createElement("li");
-  item.textContent = `${project.name} — ${project.engineLabel || "Details coming soon"}`;
-  list.append(item);
+function applyFilter(filter: string) {
+  filterButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.filter === filter)));
+  cards.forEach((card) => {
+    const engines = card.dataset.engines?.split(" ") ?? [];
+    const status = card.dataset.status ?? "";
+    const show =
+      filter === "all" ||
+      (filter === "coming-soon" ? status === "in-development" : engines.includes(filter));
+    card.hidden = !show;
+  });
 }
 
-app.append(header, title, list);
+filterButtons.forEach((button) => {
+  button.addEventListener("click", () => applyFilter(button.dataset.filter ?? "all"));
+});

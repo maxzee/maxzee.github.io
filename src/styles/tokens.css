@@ -1,30 +1,20 @@
 :root {
-  --bg: #070a12;
-  --panel: rgba(10, 14, 22, 0.9);
-  --panel-solid: #0e1420;
-  --line: #2c374b;
-  --text: #eef2f8;
-  --muted: #a7b2c3;
-  --accent: #ffd24a;
-  --hint: #7ee08f;
-  --unity: #4db6ff;
-  --unreal: #ff8a3d;
-  --other: #c7a6ff;
-  --bp-bg: #0b2447;
-  --bp-panel: rgba(10, 30, 61, 0.95);
-  --bp-line: #2e5e9a;
-  --bp-text: #e8f1ff;
-  --bp-muted: #9cc4ff;
-  color-scheme: dark;
-}
-
-:root[data-theme="light"] {
   --bg: #e8f0f6;
   --panel: rgba(255, 255, 255, 0.92);
   --panel-solid: #ffffff;
   --line: #d3dce7;
   --text: #14213d;
   --muted: #4a5a73;
+  --accent: #ffd24a;
+  --accent-ink: #14213d;
+  --hint: #2fbf63;
+  --unity: #4db6ff;
+  --unreal: #ff8a3d;
+  --other: #c7a6ff;
+  --sky-top: #4e9bd8;
+  --sky-bottom: #eaf2f4;
+  --grad-from: #4db6ff;
+  --grad-to: #ff8a3d;
   color-scheme: light;
 }
 
@@ -33,6 +23,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: "Rajdhani", system-ui, sans-serif;
+  font-weight: 500;
   font-size: 18px;
   line-height: 1.5;
 }
