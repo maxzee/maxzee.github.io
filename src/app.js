@@ -503,39 +503,58 @@ function drawStill(x, img) {
   const g = x.createLinearGradient(0, 0, WRAP_W, WRAP_H); g.addColorStop(0, "rgba(255,255,255,.14)"); g.addColorStop(0.5, "rgba(255,255,255,0)");
   x.fillStyle = g; x.fillRect(0, 0, WRAP_W, WRAP_H);
 }
-/* three wrap textures per project, shared by all of its building parts */
+/* one atlas per project: the three variations stacked (bands 0..2), with a plain roof strip underneath.
+   One texture and one day + one night material per project; every wrapped box is a single draw call. */
+const ATLAS_STRIP = 32, ATLAS_H = WRAP_H * 3 + ATLAS_STRIP;
+const ROOF_V = ATLAS_STRIP / 2 / ATLAS_H, FACADE_V = ATLAS_STRIP / ATLAS_H;   /* uv.y below FACADE_V is the roof strip */
+/* roofs and floors sample the strip; the shader paints them the plain roof colour (and keeps them dark at night) */
+function roofPatch(mat, rgb, key, unlit) {
+  const col = rgb.map((c) => (c / 255).toFixed(4)).join(", ");
+  mat.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace("#include <map_fragment>", "#include <map_fragment>\n  float wrapFacade = step(" + FACADE_V.toFixed(6) + ", vUv.y);\n  diffuseColor.rgb = mix(vec3(" + col + "), diffuseColor.rgb, wrapFacade);");
+    if (unlit) sh.fragmentShader = sh.fragmentShader.replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\n  totalEmissiveRadiance *= wrapFacade;");
+  };
+  mat.customProgramCacheKey = () => key;
+  return mat;
+}
 const wrapSets = [];
 function wrapSet(i) {
   if (wrapSets[i]) return wrapSets[i];
-  const p = PROJECTS[i], set = { day: [], night: [] };
+  const p = PROJECTS[i], c = document.createElement("canvas"); c.width = WRAP_W; c.height = ATLAS_H; const x = c.getContext("2d");
+  const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
+  const band = (k, draw) => { x.save(); x.translate(0, k * WRAP_H); x.beginPath(); x.rect(0, 0, WRAP_W, WRAP_H); x.clip(); draw(); x.restore(); };
+  x.fillStyle = "#D6C7AE"; x.fillRect(0, WRAP_H * 3, WRAP_W, ATLAS_STRIP);
+  const still = [false, false, false];
   for (let k = 0; k < 3; k++) {
-    const c = document.createElement("canvas"); c.width = WRAP_W; c.height = WRAP_H; const x = c.getContext("2d");
-    const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4; let still = false;
-    drawTheme(x, p, k);
-    fontsReady.then(() => { if (!still) { drawTheme(x, p, k); tex.needsUpdate = true; } });
+    band(k, () => drawTheme(x, p, k));
     const url = p.media.wraps.length ? p.media.wraps[k % p.media.wraps.length] : "";
-    if (url) { const img = new Image(); img.onload = () => { still = true; drawStill(x, img); tex.needsUpdate = true; }; img.src = url; }
-    set.day.push(new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }));
-    set.night.push(new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.6, color: 0x6a7080, roughness: 0.8 }));
+    if (url) { const img = new Image(); img.onload = () => { still[k] = true; band(k, () => drawStill(x, img)); tex.needsUpdate = true; }; img.src = url; }
   }
+  fontsReady.then(() => { for (let k = 0; k < 3; k++) if (!still[k]) band(k, () => drawTheme(x, p, k)); tex.needsUpdate = true; });
+  const set = {
+    day: roofPatch(new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }), [0xD6, 0xC7, 0xAE], "wrapDay"),
+    night: roofPatch(new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.6, color: 0x6a7080, roughness: 0.8 }), [0x2A, 0x35, 0x50], "wrapNight", true),
+  };
   return (wrapSets[i] = set);
 }
-/* facade of building i, variation k: part() turns this into per-face materials */
+/* facade of building i, variation k: part() turns this into the project's wrap material and atlas UVs */
 function facadeMats(i, k) { return { wrap: { i, k } }; }
-/* crop each side face of a box to a cover-fit window of the 16:9 art (faces 0,1 = sides, 4,5 = front and back) */
-function fitBoxUV(geo) {
+/* map each side face of a box into its variation's band of the atlas, as a cover-fit window of the 16:9 art (never stretched);
+   faces 0,1 = sides, 4,5 = front (street side) and back; the roof and floor (2,3) sample the plain strip */
+function fitBoxUV(geo, k) {
   const { width: W, height: H, depth: D } = geo.parameters, uv = geo.attributes.uv;
-  [[0, D, H], [1, D, H], [4, W, H], [5, W, H]].forEach(([f, fw, fh]) => {
+  [[0, D, H, (k + 1) % 3], [1, D, H, (k + 2) % 3], [4, W, H, k % 3], [5, W, H, (k + 1) % 3]].forEach(([f, fw, fh, n]) => {
     const af = fw / fh, su = af > WRAP_ASPECT ? 1 : af / WRAP_ASPECT, sv = af > WRAP_ASPECT ? WRAP_ASPECT / af : 1;
-    for (let v = f * 4; v < f * 4 + 4; v++) uv.setXY(v, 0.5 + (uv.getX(v) - 0.5) * su, 0.5 + (uv.getY(v) - 0.5) * sv);
+    const v0 = 1 - ((n + 1) * WRAP_H - 1.5) / ATLAS_H, v1 = 1 - (n * WRAP_H + 1.5) / ATLAS_H;   /* the band, inset so filtering never reaches its neighbour */
+    for (let v = f * 4; v < f * 4 + 4; v++) uv.setXY(v, 0.5 + (uv.getX(v) - 0.5) * su, v0 + (0.5 + (uv.getY(v) - 0.5) * sv) * (v1 - v0));
   });
+  for (let v = 8; v < 16; v++) uv.setXY(v, 0.5, ROOF_V);
   uv.needsUpdate = true;
 }
-/* box material order: +x, -x, top, bottom, +z (street side), -z */
 function wrapMats({ i, k }, geo) {
-  fitBoxUV(geo);
-  const set = wrapSet(i), faces = (m, roof) => [m[(k + 1) % 3], m[(k + 2) % 3], roof, roof, m[k % 3], m[(k + 1) % 3]];
-  return { day: faces(set.day, roofMats.day), night: faces(set.night, roofMats.night) };
+  fitBoxUV(geo, k);
+  const set = wrapSet(i);
+  return { day: set.day, night: set.night };
 }
 const roofMats = { day: new THREE.MeshStandardMaterial({ color: 0xD6C7AE, roughness: 1 }), night: new THREE.MeshStandardMaterial({ color: 0x2A3550, roughness: 0.9 }) };
 const detailMats = { day: new THREE.MeshStandardMaterial({ color: 0xBDB6AA, roughness: 0.8 }), night: new THREE.MeshStandardMaterial({ color: 0x222B42 }) };
@@ -1424,7 +1443,7 @@ $("prompt").addEventListener("click", () => { if ($("prompt").dataset.mode === "
 
 /* spectate orbit */
 const orbit = { theta: 0.7, phi: 0.95, r: 190 * SCALE, target: new THREE.Vector3(0, 6, 0), goal: new THREE.Vector3(0, 6, 0), goalR: 190 * SCALE, last: 0 };
-if (window.__ui) window.__city = { THREE, state, fly, orbit, camera, buildings, colliders, insideCollider, setFrameCap: (s) => { frameCap = s; } };
+if (window.__ui) window.__city = { THREE, renderer, state, fly, orbit, camera, buildings, figures, colliders, insideCollider, setFrameCap: (s) => { frameCap = s; } };
 const ptrs = new Map(); let down = null, pinch0 = 0, r0 = 0;
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 canvas.addEventListener("pointerdown", (e) => {
