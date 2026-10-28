@@ -705,12 +705,20 @@ function makeBanner(holder, p, i, col, yaw) {
   });
   return { group: g, screen, screenMat, video, playing: false, world: new THREE.Vector3() };
 }
-/* play a banner's video only while the camera is close, to save battery */
+/* play a banner's video only while the camera is close, and at most the 4 nearest at once, to save battery;
+   nothing plays while the theater is open (it covers the city) */
+const BANNER_PLAY_R = 110 * PITCH / 46, BANNER_PLAY_MAX = 4;
 function updateBanners() {
+  const off = view === "simple" || document.body.classList.contains("theater"), near = [];
   buildings.forEach((b) => {
-    const bn = b.banner; if (!bn.video) return;
-    bn.group.getWorldPosition(bn.world);
-    const close = view !== "simple" && camera.position.distanceTo(bn.world) < 150;
+    const bn = b.banner; if (!bn || !bn.video) return;
+    bn.group.getWorldPosition(bn.world); bn.dist = camera.position.distanceTo(bn.world);
+    if (!off && bn.dist < BANNER_PLAY_R) near.push(bn);
+  });
+  const play = new Set(near.sort((a, b) => a.dist - b.dist).slice(0, BANNER_PLAY_MAX));
+  buildings.forEach((b) => {
+    const bn = b.banner; if (!bn || !bn.video) return;
+    const close = play.has(bn);
     if (close && !bn.playing) { bn.playing = true; bn.screenMat.map = bn.screen.userData.videoTex; bn.screenMat.needsUpdate = true; bn.video.play().catch(() => { bn.playing = false; }); }
     else if (!close && bn.playing) { bn.playing = false; bn.video.pause(); }
   });
@@ -1193,7 +1201,9 @@ const figures = [];
 PROJECTS.forEach((p, i) => {
   const ch = CHARACTERS[p.id] || { type: "mystery", label: p.name, hi: p.name };
   const b = buildings[i], col = COLORS[p.engine], css = CSSCOL[p.engine];
-  const spot = new THREE.Group(); spot.position.set(b.center.x - 8, 0.3, b.center.z + 15.8); scene.add(spot); notBp.push(spot);
+  /* the stage stands in the banner's own frame (8 left of centre, 1.8 in front of the screen), so it stays in front of an angled banner */
+  const cs = Math.cos(b.yaw), sn = Math.sin(b.yaw), sx = -8, sz = 1.8;
+  const spot = new THREE.Group(); spot.position.set(b.center.x + sx * cs + sz * sn, 0.3, b.center.z + BZ - sx * sn + sz * cs); scene.add(spot); notBp.push(spot);
   /* hero stage: a low disc with a glowing ring in the engine colour, and a light cone at night */
   const stage = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.6, 0.5, 28), M(0x1E2533)); stage.position.y = 0.25; stage.receiveShadow = true; spot.add(stage);
   const glowRing = new THREE.Mesh(new THREE.TorusGeometry(2.45, 0.12, 8, 40), new THREE.MeshBasicMaterial({ color: col })); glowRing.rotation.x = Math.PI / 2; glowRing.position.y = 0.52; spot.add(glowRing);
@@ -1556,7 +1566,8 @@ function drawMini() {
 
 /* keep at least ~72 degrees of horizontal view, so portrait phones still see the whole banner */
 function fitFov(cam, aspect, vfov) { const hMin = 72 * Math.PI / 180; const needV = 2 * Math.atan(Math.tan(hMin / 2) / aspect) * 180 / Math.PI; cam.fov = Math.min(Math.max(vfov, needV), 100); }
-function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; fitFov(camera, w / h, 60); camera.updateProjectionMatrix(); }
+let redrawOnce = false;
+function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); redrawOnce = true; camera.aspect = w / h; fitFov(camera, w / h, 60); camera.updateProjectionMatrix(); }
 window.addEventListener("orientationchange", () => setTimeout(resize, 250));
 window.addEventListener("resize", resize); resize();
 
@@ -1785,7 +1796,8 @@ function step(now) {
   updateBanners();
   stepWater(dt); stepPeople(dt, now);
   if (driving) drawMini();
-  renderer.render(scene, camera);
+  /* the theater overlay covers the city: keep the last frame instead of drawing under it (redraw once after a resize clears the canvas) */
+  if (!document.body.classList.contains("theater") || redrawOnce) { renderer.render(scene, camera); redrawOnce = false; }
 }
 requestAnimationFrame(step);
 }
