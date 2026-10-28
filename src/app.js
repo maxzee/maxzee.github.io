@@ -1375,7 +1375,7 @@ function moveWithCollisions(dx, dz) {
     for (const c of colliders) {
       if (fly.alt > c.h || beneath(c)) continue;   /* flying above it, or passing under a raised banner */
       if (insideCollider(c, nx, nz)) {
-        if (Math.abs(state.x - c.x) >= c.rx) nx = state.x; else if (Math.abs(state.z - c.z) >= c.rz) nz = state.z; else { nx = state.x; nz = state.z; }
+        if (!insideCollider(c, state.x, nz)) nx = state.x; else if (!insideCollider(c, nx, state.z)) nz = state.z; else { nx = state.x; nz = state.z; }
         if (!bounced) { state.v *= -0.25; bounced = true; }
       }
     }
@@ -1658,9 +1658,10 @@ function step(now) {
   /* drive physics (car coasts to a stop in spectate) */
   const driving = view === "drive";
   if (driving && !auto) {
-    if (keys.rise) { if (!fly.on) liftOff(); fly.target = Math.min(90, Math.max(fly.target, fly.alt + 1.5) + 26 * dt); fly.target = Math.min(fly.target, ceilingAbove(state.x, state.z)); }
+    if (keys.rise) { if (!fly.on) liftOff(); fly.target = Math.min(90, Math.max(fly.target, fly.alt + 1.5) + 26 * dt); }
     if (keys.sink && fly.on) fly.target = Math.max(0, fly.target - 26 * dt);
   }
+  if (!auto) fly.target = Math.min(fly.target, ceilingAbove(state.x, state.z));   /* never climb into a banner from below, rising or not */
   if (fly.on && fly.target <= 0 && fly.alt < 0.05) fly.on = false;
   { const diff = fly.target - fly.alt, rate = Math.sign(diff) * Math.min(Math.abs(diff) * 1.6, 9); fly.vy = rate; fly.alt += rate * dt; if (Math.abs(diff) < 0.02) fly.alt = fly.target; }
   if (!fly.on && fly.alt < 0.05) { fly.alt = 0; document.body.classList.remove("flying"); }
