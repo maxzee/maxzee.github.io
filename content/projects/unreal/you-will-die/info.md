@@ -33,5 +33,8 @@ stack:
   - - Animation
     - 'Montages, hit reactions and ragdoll'
 district: unreal
+order: 16
+height: 28
+featured: false
 ---
 

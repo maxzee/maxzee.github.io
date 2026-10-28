@@ -13,9 +13,11 @@ summary: ''
 tags: []
 built: []
 visibility: 'yes'
-order: 10
+order: 3
 media:
   video: media/WAHM_Proof_of_Concept (1).mp4
 district: team
+height: 34
+featured: false
 ---
 

@@ -25,7 +25,7 @@ built:
   - Localized UI in English and Arabic
 visibility: 'yes'
 featured: true
-order: 2
+order: 1
 media:
   video: media/KingdomLand_Portfolio_Showcase (1).mp4
 stack:
@@ -38,5 +38,6 @@ stack:
   - - Backend
     - 'REST APIs for items, plots and profiles'
 district: team
+height: 46
 ---
 

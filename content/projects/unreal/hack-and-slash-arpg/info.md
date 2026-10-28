@@ -21,5 +21,8 @@ visibility: 'yes'
 media:
   video: media/Gameplay.mkv
 district: unreal
+order: 18
+height: 22
+featured: false
 ---
 

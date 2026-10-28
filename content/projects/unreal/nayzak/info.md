@@ -18,7 +18,8 @@ media:
   video: media/NAYZAK_Concept_Demo (1).mp4
 visibility: 'yes'
 featured: true
-order: 1
+order: 2
 district: team
+height: 40
 ---
 

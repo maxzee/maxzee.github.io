@@ -16,5 +16,8 @@ visibility: 'yes'
 media:
   video: media/Tamr.mp4
 district: team
+order: 5
+height: 24
+featured: false
 ---
 

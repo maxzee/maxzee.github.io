@@ -32,5 +32,8 @@ stack:
   - - FX
     - 'Smoke, explosions and sound'
 district: unreal
+order: 17
+height: 18
+featured: false
 ---
 

@@ -37,5 +37,7 @@ stack:
   - - Data
     - MongoDB and blockchain integration
 district: mobile
+order: 7
+height: 30
 ---
 

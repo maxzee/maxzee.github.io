@@ -1,81 +1,95 @@
 ---
 name: Muhammad Maaz Umer
+shortName: Maaz
 title: Game Developer, Unity and Unreal Engine
+lead: "I'm Maaz, a game developer with 5+ years of shipping games and real-time apps for PC, mobile and the web."
 bio: Game developer with 5+ years of experience building games in Unity (C#) and Unreal Engine (C++ and Blueprints), from gameplay systems to multiplayer and mobile delivery.
-email: ""
+email: maazpervaiz62@gmail.com
 cvPath: ""
 github: https://github.com/maxzee
 linkedin: https://www.linkedin.com/in/muhammad-maaz-umer
 yearsExperience: 5
+upworkRating: "5.0"
+skillTags: [Unity, Unreal Engine, "C#", "C++", WebGL, Firebase, Multiplayer]
+reviews:
+  - stars: 5
+    source: Upwork client review
+    project: Zombie AI for an Unreal Engine multiplayer survival game
+    short: Maaz did excellent work on a complex Zombie AI system for our Unreal Engine multiplayer survival game.
+    rest: " He implemented and improved key features including AI perception, damage sensing, player targeting, behavior trees, swarm behavior, and navigation through doors and windows. He approached difficult technical problems thoughtfully, suggested scalable solutions, and remained collaborative throughout the project. I’m very pleased with the final result and appreciate the effort he put into helping bring the AI to life. I would gladly work with him again."
+    tags: [Collaborative, Solution oriented]
 education:
-  - degree: BS in Computer Science
-    school: Shaheed Zulfikar Ali Bhutto Institute of Science and Technology (SZABIST)
+  - degree: BS Computer Science
+    school: SZABIST
     period: 2016 – 2020
 experience:
   - role: Unreal Engine Programmer
     company: 101-Dev
-    period: Dec 2025 – Present
+    period: Dec 2025 – now
     bullets:
-      - Developed and optimized large-scale environments using Unreal Engine.
-      - Implemented performance optimization for open-world scenes.
-      - Created cinematic and interactive walkthroughs for architectural visualization.
-  - role: Unity Game Developer (Mobile)
+      - Large-scale city environments and modular urban layouts
+      - Performance optimization for open-world scenes
+      - Cinematic and interactive walkthroughs
+  - role: Gameplay Programmer (volunteer)
+    company: US-based indie team
+    period: Nov 2025 – now
+    bullets:
+      - Player and companion movement, camera-relative controls
+      - Modular camera coordination and runtime character switching
+  - role: Unreal Engine Developer
+    company: Freelance, Upwork
+    period: Sep 2022 – now
+    bullets:
+      - Game systems in C++ and Blueprints, Behavior Tree AI
+      - Physics-driven mechanics and Sequencer cinematics
+  - role: Unity Game Developer (mobile)
     company: Eike Consulting
     period: Jan 2023 – Dec 2025
     bullets:
-      - Built mobile apps in Unity and C# for iOS and Android, with SOLID design and modular code.
-      - Implemented subscription management and offline persistence with SQLite.
-      - Integrated Amazon S3, Unity Addressables and RESTful APIs for cloud content delivery.
-  - role: Unreal Engine Developer
-    company: Upwork (independent projects)
-    period: Sep 2022 – Present
-    bullets:
-      - Built real-time applications and game systems in Unreal Engine with C++ and Blueprints.
-      - Implemented AI behavior with Behavior Trees and Blackboards for NPC control.
-      - Created real-time cinematic sequences with Unreal Sequencer.
+      - iOS and Android apps with SOLID architecture
+      - Subscriptions, SQLite offline data, Addressables over Amazon S3
+      - App Store and Google Play releases
   - role: Unity Game Developer (WebGL)
     company: Avanza Innovations
     period: Feb 2023 – Dec 2023
     bullets:
-      - Maintained and enhanced a WebGL metaverse platform in Unity and C#.
-      - Implemented real-time multiplayer with socket programming.
-      - Optimized performance and compatibility across browsers and devices.
-  - role: Unity Game Developer (Mobile)
+      - WebGL metaverse platform with real-time socket multiplayer
+      - Blockchain integration and browser performance
+  - role: Unity Game Developer (mobile)
     company: The Game Storm Studios
     period: Aug 2020 – Jan 2023
     bullets:
-      - Developed mobile games in Unity and C# across FPS, simulation and casual genres.
-      - "Implemented core gameplay systems: player mechanics, AI behavior, progression and in-game shops."
-      - Integrated advertising and in-app purchases, and supported post-launch updates.
+      - Shipped FPS, simulation and casual games
+      - Gameplay, AI, progression, shops, ads and in-app purchases
 expertise:
   - title: Game engines
     bullets:
-      - Unreal Engine 5 with C++ and Blueprints
-      - Unity with C# across mobile and WebGL
-      - Sequencer cinematics
+      - Unity 3D for WebGL, mobile and desktop
+      - Unreal Engine with C++ and Blueprints
+      - Cross-platform deployment
   - title: Programming
     bullets:
-      - Gameplay systems in C++ and C#
-      - SOLID principles and software design patterns
-      - AI with Behavior Trees, Blackboards and AI Perception
+      - "C# for Unity and .NET"
+      - "C++ for Unreal Engine"
+      - Blueprint visual scripting
   - title: Mobile development
     bullets:
-      - Store builds for the App Store and Google Play
-      - Offline persistence with SQLite
-      - Ads and in-app purchase integration
+      - iOS and Android
+      - App Store and Google Play submission
+      - Mobile performance optimization
   - title: Backend and APIs
     bullets:
-      - RESTful web services
-      - Amazon S3 content delivery
-      - Subscription and account systems
+      - Firebase integration
+      - RESTful APIs
+      - SQLite and MongoDB
   - title: Multiplayer and networking
     bullets:
-      - Real-time sync over sockets
-      - Blockchain integration for a WebGL metaverse
-      - Multiplayer features in Unity WebGL
+      - Socket programming
+      - Real-time communication
+      - Scalable multiplayer systems
   - title: Optimization and QA
     bullets:
-      - Profiling for memory, rendering and load times
-      - Manual and automated testing
-      - Regression checks and bug reporting
+      - Performance profiling and optimization
+      - QA automation
+      - Unity Addressables and AWS S3
 ---

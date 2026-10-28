@@ -27,5 +27,8 @@ stack:
   - - UI
     - Mobile interface
 district: sim
+order: 15
+height: 16
+featured: false
 ---
 

@@ -17,5 +17,8 @@ visibility: 'yes'
 media:
   video: media/Third Person Shooter.mp4
 district: unreal
+order: 19
+height: 20
+featured: false
 ---
 

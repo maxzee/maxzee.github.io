@@ -9,8 +9,24 @@ const MAX_PREVIEW_BYTES = 8 * 1024 * 1024;
 
 const profileSchema = z.object({
   name: z.string().min(1),
+  shortName: z.string().default(""),
   title: z.string().default(""),
+  lead: z.string().default(""),
   bio: z.string().default(""),
+  upworkRating: z.string().default(""),
+  skillTags: z.array(z.string()).default([]),
+  reviews: z
+    .array(
+      z.object({
+        stars: z.number(),
+        source: z.string(),
+        project: z.string(),
+        short: z.string(),
+        rest: z.string().default(""),
+        tags: z.array(z.string()).default([]),
+      }),
+    )
+    .default([]),
   email: z.string().default(""),
   cvPath: z.string().default(""),
   github: z.string().default(""),

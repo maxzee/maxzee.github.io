@@ -32,5 +32,8 @@ stack:
   - - Performance
     - Mobile optimization
 district: mobile
+order: 9
+height: 18
+featured: false
 ---
 

@@ -1,30 +1,32 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { renderSimple, type SiteProfile, type SiteProject } from "../src/simple/render";
+import { bodyHTML, toProject, type Profile, type SourceProject } from "../src/site/templates";
 
 const SITE_URL = "https://maxzee.github.io/";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const generated = join(root, "src", "generated");
 
-const projects = JSON.parse(readFileSync(join(generated, "projects.json"), "utf8")) as SiteProject[];
-const profile = JSON.parse(readFileSync(join(generated, "profile.json"), "utf8")) as SiteProfile;
+const projects = (JSON.parse(readFileSync(join(generated, "projects.json"), "utf8")) as SourceProject[]).map(toProject);
+const profile = JSON.parse(readFileSync(join(generated, "profile.json"), "utf8")) as Profile;
 const template = readFileSync(join(root, "index.template.html"), "utf8");
 
-for (const marker of ["<!--SIMPLE-->", "<!--HEAD-->"]) {
+for (const marker of ["<!--BODY-->", "<!--HEAD-->"]) {
   if (!template.includes(marker)) throw new Error(`index.template.html is missing the ${marker} marker`);
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
-const title = `${profile.name} — Game Developer (Unity & Unreal)`;
-const description = `Game developer with ${profile.yearsExperience}+ years in Unity (C#) and Unreal Engine (C++ and Blueprints). ${projects.length} projects, playable as a 3D city.`;
+const short = profile.shortName || profile.name.split(" ")[0];
+const title = `${short} Online — drive through my game portfolio`;
+const description = `${profile.name}, game developer with ${profile.yearsExperience}+ years in Unity (C#) and Unreal Engine (C++ and Blueprints). ${projects.length} projects, playable as a 3D city.`;
 const image = `${SITE_URL}og-image.jpg`;
 
 const person = {
   "@context": "https://schema.org",
   "@type": "Person",
   name: profile.name,
+  alternateName: short,
   jobTitle: profile.title,
   url: SITE_URL,
   sameAs: [profile.github, profile.linkedin].filter(Boolean),
@@ -50,5 +52,5 @@ const head = [
   `<script type="application/ld+json">${JSON.stringify(person).replace(/</g, "\\u003c")}</script>`,
 ].join("\n    ");
 
-writeFileSync(join(root, "index.html"), template.replace("<!--HEAD-->", head).replace("<!--SIMPLE-->", renderSimple(projects, profile)));
+writeFileSync(join(root, "index.html"), template.replace("<!--HEAD-->", head).replace("<!--BODY-->", bodyHTML(projects, profile)));
 console.log(`prerender: index.html with ${projects.length} projects`);

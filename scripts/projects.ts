@@ -36,6 +36,7 @@ export const projectSchema = z.object({
   visibility: z.enum(["yes", "footage-only", "pending", "no"]),
   style: z.enum(["tower", "midrise", "mall", "courtyard", "stepped"]).optional(),
   featured: z.boolean().default(false),
+  height: z.number().min(8).max(60).default(20),
   district: z.enum(["team", "unreal", "mobile", "sim"]).default("unreal"),
   order: z.number().optional(),
 });

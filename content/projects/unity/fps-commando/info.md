@@ -32,5 +32,8 @@ stack:
   - - Missions
     - Mission flow
 district: mobile
+order: 10
+height: 22
+featured: false
 ---
 

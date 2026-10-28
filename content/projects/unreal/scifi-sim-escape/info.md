@@ -19,5 +19,8 @@ visibility: 'yes'
 media:
   video: media/Strike.mp4
 district: unreal
+order: 20
+height: 24
+featured: false
 ---
 

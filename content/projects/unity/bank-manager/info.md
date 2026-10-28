@@ -27,5 +27,8 @@ stack:
   - - Data
     - Data management
 district: sim
+order: 13
+height: 16
+featured: false
 ---
 
