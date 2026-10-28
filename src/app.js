@@ -638,16 +638,16 @@ function nameplateTexture(p, col) {
 const frameMats = { day: new THREE.MeshStandardMaterial({ color: 0x2B3038, metalness: 0.4, roughness: 0.5 }), night: new THREE.MeshStandardMaterial({ color: 0x1A1F2A, metalness: 0.4, roughness: 0.5 }) };
 const legGeo = new THREE.BoxGeometry(1.1, BY, 1.1);
 /* frame + pylons; every banner part is clickable and opens the video player */
-const bannerPicks = [];
+const bannerPicks = new Set();
 function bannerFrame(g, i) {
-  bannerPicks.push(part(g, new THREE.BoxGeometry(BW + 0.8, BH + 0.8, 0.6), 0, BY + BH / 2, 0, frameMats, i));
+  bannerPicks.add(part(g, new THREE.BoxGeometry(BW + 0.8, BH + 0.8, 0.6), 0, BY + BH / 2, 0, frameMats, i));
   part(g, legGeo, -LEG_X, BY / 2, 0, frameMats); part(g, legGeo, LEG_X, BY / 2, 0, frameMats);
 }
 /* the same picture on the front and the back (a plane turned round reads correctly from behind) */
 function bannerScreen(g, mat, i) {
   const geo = new THREE.PlaneGeometry(BW, BH), front = new THREE.Mesh(geo, mat), back = new THREE.Mesh(geo, mat);
   front.position.set(0, BY + BH / 2, 0.31); back.position.set(0, BY + BH / 2, -0.31); back.rotation.y = Math.PI;
-  [front, back].forEach((m) => { m.userData.i = i; g.add(m); pickables.push(m); bannerPicks.push(m); });
+  [front, back].forEach((m) => { m.userData.i = i; g.add(m); pickables.push(m); bannerPicks.add(m); });
   return front;
 }
 function bannerPlate(g, mat) {
@@ -1432,29 +1432,34 @@ function pick(cx, cy) {
   ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
   ray.setFromCamera(ndc, camera);
   const hit = ray.intersectObjects(pickables, false)[0];
-  if (hit) { const i = hit.object.userData.i; if (bannerPicks.includes(hit.object)) openTheater(i); else openStop(i); focus(i); }
+  if (hit) { const i = hit.object.userData.i; if (bannerPicks.has(hit.object)) openTheater(i); else openStop(i); focus(i); }
 }
 /* drive: tap or click a banner to watch it; the cursor shows what can be clicked */
-function pickAt(list, cx, cy) {
+function nearestHit(cx, cy) {
   const r = canvas.getBoundingClientRect();
   ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
   ray.setFromCamera(ndc, camera);
-  const hit = ray.intersectObjects(list, false)[0];
-  return hit ? hit.object.userData.i : -1;
+  return ray.intersectObjects(pickables, false)[0];
 }
+/* the nearest thing under the pointer must itself be a banner, so a building in front hides one behind it */
+function pickBanner(cx, cy) {
+  const hit = nearestHit(cx, cy);
+  return hit && bannerPicks.has(hit.object) ? hit.object.userData.i : -1;
+}
+if (window.__ui) window.__ui.pickBanner = pickBanner;
 let tap = null, hoverT = 0;
 canvas.addEventListener("pointerdown", (e) => { if (view === "drive") tap = { x: e.clientX, y: e.clientY, t: performance.now() }; });
 canvas.addEventListener("pointerup", (e) => {
   if (view !== "drive" || !tap) return;
   const still = Math.abs(e.clientX - tap.x) + Math.abs(e.clientY - tap.y) < 8 && performance.now() - tap.t < 500; tap = null;
   if (!still) return;
-  const i = pickAt(bannerPicks, e.clientX, e.clientY);
+  const i = pickBanner(e.clientX, e.clientY);
   if (i >= 0) { if (touring) endTour(); cancelAuto(); openTheater(i); }
 });
 canvas.addEventListener("pointermove", (e) => {
   if (e.pointerType !== "mouse" || view === "simple" || e.buttons) return;
   const now = performance.now(); if (now - hoverT < 90) return; hoverT = now;
-  canvas.classList.toggle("can-click", pickAt(view === "drive" ? bannerPicks : pickables, e.clientX, e.clientY) >= 0);
+  canvas.classList.toggle("can-click", (view === "drive" ? pickBanner(e.clientX, e.clientY) >= 0 : !!nearestHit(e.clientX, e.clientY)));
 });
 function focus(i) { const b = buildings[i]; orbit.goal.set(b.center.x, b.h * 0.5, b.center.z); orbit.goalR = 80; orbit.last = performance.now(); }
 
