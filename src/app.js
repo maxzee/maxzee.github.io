@@ -79,11 +79,15 @@ function openTheater(i) {
   const v = $("thVid");
   if (v.dataset.i !== String(i)) { v.src = p.media.video; v.poster = p.media.poster || ""; v.dataset.i = String(i); }
   v.play().catch(() => {});
+  v.focus({ preventScroll: true });   /* keyboard and screen-reader users land on the player */
 }
 function endTheater() {
   theaterIdx = -1;
   if (!document.body.classList.contains("theater")) return;
+  const hadFocus = $("theater").contains(document.activeElement);
   document.body.classList.remove("theater"); $("thVid").pause();
+  /* give focus back to the action bar (or the city) only if it was in the player, so view buttons keep theirs */
+  if (hadFocus) { const btn = [...$("act").querySelectorAll(".btn")].find((x) => x.offsetParent !== null); (btn || $("scene")).focus({ preventScroll: true }); }
 }
 function actBtn(label, fn, primary, href) {
   const el = document.createElement(href ? "a" : "button"); el.className = "btn" + (primary ? " primary" : "");

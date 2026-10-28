@@ -229,7 +229,7 @@ export function bodyHTML(projects: Project[], profile: Profile, reel: Showreel) 
     .join("\n          ");
 
   return `<div id="app">
-  <canvas id="scene" aria-label="3D city. Each building is one of ${esc(short)}'s game projects."></canvas>
+  <canvas id="scene" tabindex="-1" aria-label="3D city. Each building is one of ${esc(short)}'s game projects."></canvas>
 
   <header id="hdr">
     <div class="hb"><b>${esc(short)}</b><span>Game Developer, Unity and Unreal</span></div>
@@ -438,7 +438,7 @@ export function bodyHTML(projects: Project[], profile: Profile, reel: Showreel) 
     </div>
   </div>
 
-  <div id="theater" aria-label="Project video">
+  <div id="theater" role="dialog" aria-modal="false" aria-label="Project video">
     <video id="thVid" controls playsinline preload="none"></video>
   </div>
   <aside id="card" class="panel" role="dialog" aria-modal="false" aria-labelledby="cTitle">
