@@ -1641,6 +1641,15 @@ setTimeout(() => $("loader").classList.add("gone"), reduceMotion ? 0 : 700);
 /* loop */
 let last = performance.now(), t = 0, frameCap = null;   /* frameCap: debug only, forces every frame's dt */
 const camPos = new THREE.Vector3(), look3 = new THREE.Vector3(), bannerAim = new THREE.Vector3(), fitPos = new THREE.Vector3(); let frame = 0;
+/* the building straight across the street from building i (one PITCH further along z); Task 6 generalises this */
+const acrossOf = (i) => { const c = buildings[i] && buildings[i].center; return c ? buildings.find((o) => o.center && o.center.x === c.x && o.center.z === c.z + PITCH) : undefined; };
+let hiddenAcross = [];
+/* hide exactly the buildings in `list` (and restore any previously hidden ones no longer listed) */
+function setHidden(list) {
+  hiddenAcross.forEach((o) => { if (!list.includes(o)) { o.holder.visible = true; o.sprite.visible = true; } });
+  list.forEach((o) => { o.holder.visible = false; o.sprite.visible = false; });
+  hiddenAcross = list;
+}
 function insideBuilding(x, y, z) { return buildings.some((b) => Math.abs(x - b.center.x) < HALF + 2 && Math.abs(z - b.center.z) < HALF + 2.5 && y < b.h + 2); }
 function step(now) {
   requestAnimationFrame(step);
@@ -1699,17 +1708,20 @@ function step(now) {
     clear = Math.max(clear, 0.3); camPos.set(state.x + ddx * clear, camPos.y + (1 - clear) * 7, state.z + ddz * clear);
     /* parked: frame the whole banner and its nameplate, square on, at the distance where it just fits the screen
        (the building across the street may contain the camera; its walls face away, so it does not block the view) */
-    if (frame > 0.01 && focusIdx >= 0) {
-      const b = buildings[focusIdx], tv = Math.tan(camera.fov * Math.PI / 360), th = tv * camera.aspect;
+    const fitW = arrivedIdx >= 0 ? frame : 0;   /* only an actual arrival frames the banner; merely passing a pad keeps the chase camera */
+    const ac = fitW > 0.5 ? acrossOf(arrivedIdx) : undefined; setHidden(ac ? [ac] : []);
+    if (fitW > 0.01) {
+      const b = buildings[arrivedIdx], tv = Math.tan(camera.fov * Math.PI / 360), th = tv * camera.aspect;
       const d = Math.max(BANNER_HALF_H / tv, (BW / 2 + 0.8) / th) * 1.24;
       bannerAim.set(b.center.x, BANNER_MID + 1.4, b.center.z + BZ);   /* aim a little high so the header never covers the nameplate */
-      fitPos.set(b.center.x, BANNER_MID + 1.5, b.center.z + BZ + d); camPos.lerp(fitPos, frame);
+      fitPos.set(b.center.x, BANNER_MID + 1.5, b.center.z + BZ + d); camPos.lerp(fitPos, fitW);
     }
     if (camSnap) { camera.position.copy(camPos); camSnap = false; } else camera.position.lerp(camPos, 1 - Math.pow(auto ? 0.0002 : 0.002, rawDt));
     look3.set(state.x + fx * 12, 5 + alt * 0.85, state.z + fz * 12);
-    if (frame > 0.01 && focusIdx >= 0) look3.lerp(bannerAim, frame);
+    if (fitW > 0.01) look3.lerp(bannerAim, fitW);
     camera.lookAt(look3);
   } else {
+    if (hiddenAcross.length) setHidden([]);
     if (!reduceMotion && now - orbit.last > 4000) orbit.theta += dt * 0.07;
     orbit.target.lerp(orbit.goal, 1 - Math.pow(0.02, dt));
     orbit.r += (orbit.goalR - orbit.r) * (1 - Math.pow(0.02, dt));
