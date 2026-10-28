@@ -42,6 +42,7 @@ const fontsReady = Promise.all(
 
 let view = "drive", look = "day", cardIndex = -1;
 let hooks = { onView: null, onLook: null, travel: null };
+if (/[?&]debug\b/.test(location.search)) window.__ui = { openTheater, indexOf: (id) => PROJECTS.findIndex((p) => p.id === id) };
 
 /* ---------- remembered "tried" options (per viewer) ---------- */
 let tried = {};
@@ -68,16 +69,19 @@ let arrivedIdx = -1;
 function showDetails(i) { if (i < PROJECTS.length) openCard(i); else openSpecial(SPECIALS[i - PROJECTS.length].kind); document.body.classList.add("paneled"); }
 function leaveArrival() { arrivedIdx = -1; endTheater(); document.body.classList.remove("cine", "arrived", "paneled"); }
 /* theater: a banner's video played large, with the project panel beside it */
+let theaterIdx = -1;
 function openTheater(i) {
   const p = i < PROJECTS.length ? PROJECTS[i] : null;
-  if (view === "simple" || !p || !p.media.video) { showDetails(i); return; }
-  document.body.classList.add("theater");
-  showDetails(i);
+  if (hooks.tour && document.body.classList.contains("touring")) hooks.tour.stop();
+  if (view === "simple" || !p || !p.media.video) { endTheater(); showDetails(i); return; }
+  document.body.classList.add("theater"); theaterIdx = i;
+  showDetails(i); hooks.onTheater?.();
   const v = $("thVid");
   if (v.dataset.i !== String(i)) { v.src = p.media.video; v.poster = p.media.poster || ""; v.dataset.i = String(i); }
   v.play().catch(() => {});
 }
 function endTheater() {
+  theaterIdx = -1;
   if (!document.body.classList.contains("theater")) return;
   document.body.classList.remove("theater"); $("thVid").pause();
 }
@@ -140,7 +144,7 @@ function openCard(i) {
     h += '<dl class="facts"><dt>Role</dt><dd>' + esc(p.role) + "</dd></dl>";
     if (p.stack.length) h += '<div class="meta">How I built it, top layer first</div><div class="stack">' + p.stack.map((s) => "<div><b>" + esc(s[0]) + "</b><span>" + esc(s[1]) + "</span></div>").join("") + "</div>";
   } else {
-    if (document.body.classList.contains("theater")) h += "";
+    if (view !== "simple" && theaterIdx === i) h += "";
     else if (p.media.video) h += '<div class="media"><video src="' + esc(p.media.video) + '" ' + (p.media.poster ? 'poster="' + esc(p.media.poster) + '" ' : "") + "controls playsinline preload=\"metadata\"></video></div>";
     else if (p.media.poster) h += '<div class="media"><img src="' + esc(p.media.poster) + '" alt="' + esc(p.name) + ' screenshot"></div>';
     else h += '<div class="media">Footage coming soon</div>';
@@ -159,7 +163,7 @@ function closeCard() {
 }
 function goTo(i) {
   if (view === "drive" && hooks.driveTo) hooks.driveTo(i);
-  else { openCard(i); if (view === "spectate" && hooks.focus) hooks.focus(i); }
+  else { if (theaterIdx >= 0) openTheater(i); else openCard(i); if (view === "spectate" && hooks.focus) hooks.focus(i); }
 }
 $("cClose").addEventListener("click", closeCard);
 $("cNext").addEventListener("click", () => goTo((Math.max(cardIndex, 0) + 1) % PROJECTS.length));
@@ -254,7 +258,7 @@ $("tourExit").addEventListener("click", () => { if (hooks.tour) hooks.tour.stop(
 /* ---------- view + look ---------- */
 function setView(v) {
   if (v === view && document.body.classList.contains("view-" + v)) return;
-  view = v;
+  endTheater(); view = v;
   document.body.classList.remove("view-drive", "view-spectate", "view-simple");
   document.body.classList.add("view-" + v);
   document.querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === v)));
@@ -1366,7 +1370,9 @@ function land() {
   else fly.target = 0;
 }
 let near = -1;
+hooks.onTheater = () => Object.keys(keys).forEach((k) => keys[k] = false);
 window.addEventListener("keydown", (e) => {
+  if (document.body.classList.contains("theater") && e.code !== "Escape") return;
   if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
   if (view !== "drive") return;
   if (map[e.code]) { keys[map[e.code]] = true; if (e.code.startsWith("Arrow")) e.preventDefault(); }
@@ -1389,6 +1395,7 @@ $("prompt").addEventListener("click", () => { if ($("prompt").dataset.mode === "
 
 /* spectate orbit */
 const orbit = { theta: 0.7, phi: 0.95, r: 190, target: new THREE.Vector3(0, 6, 0), goal: new THREE.Vector3(0, 6, 0), goalR: 190, last: 0 };
+if (window.__ui) window.__city = { state, fly, orbit, camera, buildings, colliders };
 const ptrs = new Map(); let down = null, pinch0 = 0, r0 = 0;
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 canvas.addEventListener("pointerdown", (e) => {
