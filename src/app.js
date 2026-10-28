@@ -1363,7 +1363,25 @@ const map = { KeyW: "up", ArrowUp: "up", KeyS: "down", ArrowDown: "down", KeyA: 
 const fly = { on: false, alt: 0, target: 0, vy: 0 };
 const JET_TOP = 2.4;   /* height of the jet's top above its altitude */
 const beneath = (c) => c.y0 !== undefined && fly.alt + JET_TOP < c.y0;
-function overRoof(x, z) { return colliders.some((c) => !beneath(c) && Math.abs(x - c.x) < c.rx && Math.abs(z - c.z) < c.rz); }
+const insideCollider = (c, x, z) => Math.abs(x - c.x) < c.rx && Math.abs(z - c.z) < c.rz;   /* the one rectangle test every collider check uses */
+function overRoof(x, z) { return colliders.some((c) => !beneath(c) && insideCollider(c, x, z)); }
+/* lowest height the jet may climb to while under a raised banner at (x, z); Infinity when none */
+function ceilingAbove(x, z) { let m = Infinity; for (const c of colliders) if (c.y0 !== undefined && beneath(c) && insideCollider(c, x, z)) m = Math.min(m, c.y0 - JET_TOP - 0.3); return m; }
+/* move in substeps of at most 0.6 units so thin colliders cannot be tunnelled at any frame rate */
+function moveWithCollisions(dx, dz) {
+  const n = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.6)), sx = dx / n, sz = dz / n; let bounced = false;
+  for (let k = 0; k < n; k++) {
+    let nx = state.x + sx, nz = state.z + sz;
+    for (const c of colliders) {
+      if (fly.alt > c.h || beneath(c)) continue;   /* flying above it, or passing under a raised banner */
+      if (insideCollider(c, nx, nz)) {
+        if (Math.abs(state.x - c.x) >= c.rx) nx = state.x; else if (Math.abs(state.z - c.z) >= c.rz) nz = state.z; else { nx = state.x; nz = state.z; }
+        if (!bounced) { state.v *= -0.25; bounced = true; }
+      }
+    }
+    state.x = nx; state.z = nz;
+  }
+}
 function liftOff() { fly.on = true; document.body.classList.add("flying"); closeCard(); leaveArrival(); }
 function land() {
   if (overRoof(state.x, state.z)) toast("Find a street to land on.", "You are above a building. Fly over a road or a ring, then hold E to come down.", [["OK", () => {}]]);
@@ -1395,7 +1413,7 @@ $("prompt").addEventListener("click", () => { if ($("prompt").dataset.mode === "
 
 /* spectate orbit */
 const orbit = { theta: 0.7, phi: 0.95, r: 190, target: new THREE.Vector3(0, 6, 0), goal: new THREE.Vector3(0, 6, 0), goalR: 190, last: 0 };
-if (window.__ui) window.__city = { state, fly, orbit, camera, buildings, colliders };
+if (window.__ui) window.__city = { state, fly, orbit, camera, buildings, colliders, insideCollider, setFrameCap: (s) => { frameCap = s; } };
 const ptrs = new Map(); let down = null, pinch0 = 0, r0 = 0;
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 canvas.addEventListener("pointerdown", (e) => {
@@ -1621,12 +1639,12 @@ window.addEventListener("hashchange", () => { const idx = PROJECTS.findIndex((p)
 setTimeout(() => $("loader").classList.add("gone"), reduceMotion ? 0 : 700);
 
 /* loop */
-let last = performance.now(), t = 0;
+let last = performance.now(), t = 0, frameCap = null;   /* frameCap: debug only, forces every frame's dt */
 const camPos = new THREE.Vector3(), look3 = new THREE.Vector3(), bannerAim = new THREE.Vector3(), fitPos = new THREE.Vector3(); let frame = 0;
 function insideBuilding(x, y, z) { return buildings.some((b) => Math.abs(x - b.center.x) < HALF + 2 && Math.abs(z - b.center.z) < HALF + 2.5 && y < b.h + 2); }
 function step(now) {
   requestAnimationFrame(step);
-  const rawDt = Math.min((now - last) / 1000, 0.25), dt = Math.min(rawDt, 0.05); last = now; t += dt;
+  const rawDt = Math.min((now - last) / 1000, 0.25), dt = frameCap != null ? frameCap : Math.min(rawDt, 0.05); last = now; t += dt;
   if (!introDone) {
     const intro = reduceMotion ? 1 : (now - introStart) / 2200;
     buildings.forEach((b, k) => { const lp = Math.min(Math.max(intro * 1.6 - k * 0.04, 0), 1); b.holder.scale.y = Math.max(0.001, 1 - Math.pow(1 - lp, 3)); });
@@ -1640,7 +1658,7 @@ function step(now) {
   /* drive physics (car coasts to a stop in spectate) */
   const driving = view === "drive";
   if (driving && !auto) {
-    if (keys.rise) { if (!fly.on) liftOff(); fly.target = Math.min(90, Math.max(fly.target, fly.alt + 1.5) + 26 * dt); }
+    if (keys.rise) { if (!fly.on) liftOff(); fly.target = Math.min(90, Math.max(fly.target, fly.alt + 1.5) + 26 * dt); fly.target = Math.min(fly.target, ceilingAbove(state.x, state.z)); }
     if (keys.sink && fly.on) fly.target = Math.max(0, fly.target - 26 * dt);
   }
   if (fly.on && fly.target <= 0 && fly.alt < 0.05) fly.on = false;
@@ -1652,17 +1670,10 @@ function step(now) {
   if (Math.abs(state.v) < 0.3 && !(driving && (keys.up || keys.down))) state.v = 0;
   const turn = driving ? (keys.left ? 1 : 0) - (keys.right ? 1 : 0) : 0;
   state.h += turn * dt * (1.6 + Math.min(Math.abs(state.v), 30) * 0.03) * (state.v < -0.5 ? -1 : 1);
-  let nx = state.x + Math.sin(state.h) * state.v * dt, nz = state.z + Math.cos(state.h) * state.v * dt;
-  if (!auto) for (const c of colliders) {
-    if (fly.alt > c.h || beneath(c)) continue;   /* flying above it, or passing under a raised banner */
-    if (Math.abs(nx - c.x) < c.rx && Math.abs(nz - c.z) < c.rz) {
-      if (Math.abs(state.x - c.x) >= c.rx) nx = state.x; else if (Math.abs(state.z - c.z) >= c.rz) nz = state.z; else { nx = state.x; nz = state.z; }
-      state.v *= -0.25;
-    }
-  }
+  if (!auto) moveWithCollisions(Math.sin(state.h) * state.v * dt, Math.cos(state.h) * state.v * dt);
   /* descending onto a roof is blocked: hold height above it */
-  if (fly.on || fly.alt > 0) for (const c of colliders) { if (beneath(c)) continue; if (Math.abs(state.x - c.x) < c.rx && Math.abs(state.z - c.z) < c.rz && fly.alt < c.h + 0.5 && fly.target < c.h + 2) { fly.target = Math.max(fly.target, c.h + 3); if (!fly.on) fly.on = true; } }
-  if (!auto) { state.x = Math.max(-EX + 4, Math.min(EX - 4, nx)); state.z = Math.max(-EZ + 4, Math.min(EZ - 4, nz)); }
+  if (fly.on || fly.alt > 0) for (const c of colliders) { if (beneath(c)) continue; if (insideCollider(c, state.x, state.z) && fly.alt < c.h + 0.5 && fly.target < c.h + 2) { fly.target = Math.max(fly.target, c.h + 3); if (!fly.on) fly.on = true; } }
+  if (!auto) { state.x = Math.max(-EX + 4, Math.min(EX - 4, state.x)); state.z = Math.max(-EZ + 4, Math.min(EZ - 4, state.z)); }
   const alt = autoAlt + fly.alt;
   car.position.set(state.x, 1.2 + alt + (reduceMotion ? 0 : Math.sin(t * 3) * 0.12), state.z);
   car.rotation.y = state.h;
