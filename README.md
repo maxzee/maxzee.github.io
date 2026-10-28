@@ -50,6 +50,9 @@ visibility: "yes"           # yes | footage-only | pending | no
 media:
   video: media/clip.mp4     # source clip for the preview
   start: 12                 # optional: second to cut the preview from
+  character: media/hero.glb # optional: 3D model that stands outside the building
+talk:                       # optional: what the character says while you're parked
+  - Hi! This is my game.
 ---
 ```
 
@@ -57,13 +60,17 @@ The build fails with a clear message if a required field is missing or wrong. Em
 
 ## Footage
 
-Raw clips stay out of git. The media script cuts a 6-second silent preview and a poster for every project that has `media.video`:
+Raw clips stay out of git. For every project that has `media.video`, the media script makes a 6-second silent loop for the building banner, a poster, and a full-length 720p copy with sound for the project cards. It also joins 4 seconds of each project into `public/showreel.mp4`, with chapter times in `showreel.json`:
 
 ```bash
 npm run media
 ```
 
-It needs [ffmpeg](https://ffmpeg.org/). If ffmpeg isn't on your `PATH`, set `FFMPEG` to its full path. Outputs go to `public/projects/<id>/preview.mp4` and `poster.webp`, and these are committed. Add `-- --force` to regenerate existing ones.
+It needs [ffmpeg](https://ffmpeg.org/). If ffmpeg isn't on your `PATH`, set `FFMPEG` to its full path. Outputs go to `public/projects/<id>/preview.mp4`, `full.mp4` and `poster.webp`, and these are committed. Add `-- --force` to regenerate existing ones.
+
+## Character models
+
+Each building has a character outside it. Without a model it's a placeholder built from simple shapes. To use a real one, put a `.glb` file in the project's `media/` folder and set `media.character`. The model is scaled to the stage, so any size works. Keep it under about 5 MB, facing +Z (glTF default), with feet at the origin. If it has animation clips, one named `Idle` loops, and one named `Wave` (or `Greet`, `Talk`) plays while a visitor is parked there.
 
 ## Your profile
 

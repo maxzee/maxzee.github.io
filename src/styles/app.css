@@ -95,6 +95,7 @@ body.bp #card{background:#0A1E3D}
 body.bp .meta{color:var(--bp-muted)}
 .media{aspect-ratio:16/9; border:1px dashed #3B4862; border-radius:8px; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:14px; overflow:hidden; background:#0A0E18}
 .media video,.media img{width:100%; height:100%; object-fit:cover; display:block}
+.media video[controls]{object-fit:contain; background:#000}
 .facts{display:grid; grid-template-columns:86px minmax(0,1fr); gap:6px 10px; font-size:15px; margin:0}
 .facts dt{color:var(--muted)} .facts dd{margin:0; font-weight:700}
 body.bp .facts dt{color:var(--bp-muted)}
@@ -136,6 +137,7 @@ body.bp .sv-hero .lead, body.bp .sv-sub, body.bp .sv-meta, body.bp .sv-stats spa
 .sv-cta{display:flex; gap:10px; flex-wrap:wrap; margin-top:30px}
 .sv-media{position:relative; aspect-ratio:16/9; border-radius:14px; overflow:hidden; background:#0B0F17; color:#EEF2F8; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; border:1px solid var(--line); text-align:center}
 .sv-media video,.sv-media img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
+.sv-media video[controls]{object-fit:contain; background:#000}
 .sv-media .pl{width:72px; height:72px; border-radius:999px; background:rgba(255,255,255,.14); display:flex; align-items:center; justify-content:center}
 .sv-media small{font-size:16px; font-weight:700}
 .sv-media .bar{position:absolute; left:0; right:0; bottom:0; height:5px}
@@ -362,8 +364,9 @@ body.cine #tourBar{bottom:calc(9vh + 14px); left:28px; transform:none}
 }
 #choice .box{max-height:calc(100% - 20px); overflow:auto}
 
-#touch .fly{flex-direction:column; gap:0; font-size:12px; font-weight:700; color:var(--text)}
-#touch .fly[aria-pressed="true"]{background:var(--accent); color:#0A0E16; border-color:var(--accent)}
+#touch .alt{display:flex; flex-direction:column; gap:6px}
+#touch .alt button{flex:1 1 0; height:auto; min-height:0; gap:4px; font-size:13px; font-weight:700}
+#touch .alt button:active{background:var(--accent); color:#0A0E16; border-color:var(--accent)}
 
 /* centred hero: headline, live-city stage with soft glow, glass stats bar (inspired by Maaz's reference) */
 .sv-hero2{display:flex; flex-direction:column; align-items:center; text-align:center; padding:70px 0 56px}

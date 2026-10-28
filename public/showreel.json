@@ -1,0 +1,62 @@
+{
+  "video": "/showreel.mp4",
+  "poster": "",
+  "chapters": [
+    {
+      "id": "kingdomland",
+      "at": 0
+    },
+    {
+      "id": "nayzak",
+      "at": 4
+    },
+    {
+      "id": "wahm",
+      "at": 8
+    },
+    {
+      "id": "mars-simulation",
+      "at": 12
+    },
+    {
+      "id": "tamr",
+      "at": 16
+    },
+    {
+      "id": "orionmeta",
+      "at": 20
+    },
+    {
+      "id": "mototraffic-rider",
+      "at": 24
+    },
+    {
+      "id": "fps-commando",
+      "at": 28
+    },
+    {
+      "id": "you-will-die",
+      "at": 32
+    },
+    {
+      "id": "tank-game",
+      "at": 36
+    },
+    {
+      "id": "hack-and-slash-arpg",
+      "at": 40
+    },
+    {
+      "id": "space-fighter",
+      "at": 44
+    },
+    {
+      "id": "scifi-sim-escape",
+      "at": 48
+    },
+    {
+      "id": "island-of-deceit",
+      "at": 52
+    }
+  ]
+}

@@ -32,6 +32,8 @@ export const projectSchema = z.object({
       gallery: z.array(z.string()).default([]),
     })
     .default({ gallery: [] }),
+  // lines the building's character says when you park there (falls back to the summary)
+  talk: z.array(z.string()).default([]),
   links: z.array(z.object({ label: z.string(), href: z.string() })).default([]),
   visibility: z.enum(["yes", "footage-only", "pending", "no"]),
   style: z.enum(["tower", "midrise", "mall", "courtyard", "stepped"]).optional(),

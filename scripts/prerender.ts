@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { bodyHTML, toProject, type Profile, type SourceProject } from "../src/site/templates";
+import { bodyHTML, toProject, type Profile, type Showreel, type SourceProject } from "../src/site/templates";
 
 const SITE_URL = "https://maxzee.github.io/";
 
@@ -10,6 +10,7 @@ const generated = join(root, "src", "generated");
 
 const projects = (JSON.parse(readFileSync(join(generated, "projects.json"), "utf8")) as SourceProject[]).map(toProject);
 const profile = JSON.parse(readFileSync(join(generated, "profile.json"), "utf8")) as Profile;
+const reel = JSON.parse(readFileSync(join(generated, "showreel.json"), "utf8")) as Showreel;
 const template = readFileSync(join(root, "index.template.html"), "utf8");
 
 for (const marker of ["<!--BODY-->", "<!--HEAD-->"]) {
@@ -52,5 +53,5 @@ const head = [
   `<script type="application/ld+json">${JSON.stringify(person).replace(/</g, "\\u003c")}</script>`,
 ].join("\n    ");
 
-writeFileSync(join(root, "index.html"), template.replace("<!--HEAD-->", head).replace("<!--BODY-->", bodyHTML(projects, profile)));
+writeFileSync(join(root, "index.html"), template.replace("<!--HEAD-->", head).replace("<!--BODY-->", bodyHTML(projects, profile, reel)));
 console.log(`prerender: index.html with ${projects.length} projects`);

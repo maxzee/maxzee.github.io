@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import matter from "gray-matter";
 import { z } from "zod";
@@ -41,27 +41,39 @@ const profileSchema = z.object({
   expertise: z.array(z.object({ title: z.string(), bullets: z.array(z.string()) })).default([]),
 });
 
-function publishedMedia(id: string) {
-  const preview = join(publicProjectsDir, id, "preview.mp4");
-  const poster = join(publicProjectsDir, id, "poster.webp");
-  if (existsSync(preview) && statSync(preview).size > MAX_PREVIEW_BYTES) {
-    console.warn(`warning: ${preview} is over 8 MB`);
+function publishedMedia(id: string, dir: string, character?: string) {
+  const at = (name: string) => join(publicProjectsDir, id, name);
+  const url = (name: string) => (existsSync(at(name)) ? `/projects/${id}/${name}` : "");
+  if (existsSync(at("preview.mp4")) && statSync(at("preview.mp4")).size > MAX_PREVIEW_BYTES) {
+    console.warn(`warning: ${at("preview.mp4")} is over 8 MB`);
   }
-  return {
-    preview: existsSync(preview) ? `/projects/${id}/preview.mp4` : "",
-    poster: existsSync(poster) ? `/projects/${id}/poster.webp` : "",
-  };
+  // a 3D model for the building's character: copied as-is next to the other published media
+  if (character) {
+    const source = join(dir, character);
+    if (!existsSync(source)) console.warn(`warning: ${id}: character model not found: ${source}`);
+    else {
+      mkdirSync(join(publicProjectsDir, id), { recursive: true });
+      copyFileSync(source, at("character.glb"));
+    }
+  }
+  return { preview: url("preview.mp4"), full: url("full.mp4"), poster: url("poster.webp"), character: url("character.glb") };
 }
 
 function loadProjects() {
-  return loadProjectEntries().map(({ project }) => {
+  return loadProjectEntries().map(({ project, dir }) => {
     const { media, ...rest } = project;
-    const published = publishedMedia(project.id);
+    const published = publishedMedia(project.id, dir, media.character);
     if (media.video && !published.preview) {
       console.warn(`warning: ${project.id} has a source clip but no preview yet. Run: npm run media`);
     }
     return { ...rest, ...published };
   });
+}
+
+function loadShowreel() {
+  const file = join(root, "public", "showreel.json");
+  if (!existsSync(file) || !existsSync(join(root, "public", "showreel.mp4"))) return { video: "", poster: "", chapters: [] };
+  return JSON.parse(readFileSync(file, "utf8"));
 }
 
 function loadProfile() {
@@ -78,4 +90,5 @@ const profile = loadProfile();
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, "projects.json"), JSON.stringify(projects, null, 2));
 writeFileSync(join(outDir, "profile.json"), JSON.stringify(profile, null, 2));
+writeFileSync(join(outDir, "showreel.json"), JSON.stringify(loadShowreel(), null, 2));
 console.log(`content: ${projects.length} projects, profile for ${profile.name}`);

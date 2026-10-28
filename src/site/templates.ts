@@ -24,7 +24,10 @@ export interface SourceProject {
   height: number;
   district: string;
   preview: string;
+  full: string;
   poster: string;
+  character: string;
+  talk: string[];
 }
 
 export interface Project {
@@ -42,7 +45,9 @@ export interface Project {
   built: string[];
   results: string;
   stack: [string, string][];
-  media: { video: string; poster: string };
+  // video: the whole clip with sound; loop: the short silent clip for banners
+  media: { video: string; loop: string; poster: string; character: string };
+  talk: string[];
   links: { label: string; href: string }[];
   visibility: SourceProject["visibility"];
   featured: boolean;
@@ -99,7 +104,8 @@ export function toProject(p: SourceProject): Project {
     built: p.built,
     results: p.results.join(", "),
     stack: p.stack,
-    media: { video: p.preview, poster: p.poster },
+    media: { video: p.full || p.preview, loop: p.preview, poster: p.poster, character: p.character },
+    talk: p.talk,
     links: p.links,
     visibility: p.visibility,
     featured: p.featured,
@@ -176,10 +182,23 @@ export function gridHTML(projects: Project[], filter: string) {
   return projects.map((p, i) => (matchesFilter(p, filter) ? cardHTML(p, i) : "")).join("");
 }
 
-export function chaptersHTML(projects: Project[]) {
-  return SHOWREEL_CHAPTERS.map((id, k) => {
-    const p = projects.find((x) => x.id === id);
-    return p ? `<button type="button" data-ch="${k}"><b>${esc(p.name)}</b><span>Open in 3D</span></button>` : "";
+export interface Showreel {
+  video: string;
+  poster: string;
+  chapters: { id: string; at: number | null }[];
+}
+
+/* chapters come from the built showreel; without one, the buttons just open each project in 3D */
+export function reelChapters(reel: Showreel) {
+  return reel.chapters.length ? reel.chapters : SHOWREEL_CHAPTERS.map((id) => ({ id, at: null }));
+}
+
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+export function chaptersHTML(projects: Project[], reel: Showreel) {
+  return reelChapters(reel).map((c, k) => {
+    const p = projects.find((x) => x.id === c.id);
+    return p ? `<button type="button" data-ch="${k}"><b>${esc(p.name)}</b><span>${c.at == null ? "Open in 3D" : clock(c.at)}</span></button>` : "";
   }).join("");
 }
 
@@ -191,7 +210,7 @@ export function reviewHTML(r: Review) {
   );
 }
 
-export function bodyHTML(projects: Project[], profile: Profile) {
+export function bodyHTML(projects: Project[], profile: Profile, reel: Showreel) {
   const N = projects.length;
   const short = profile.shortName || profile.name.split(" ")[0];
   const mail = profile.email ? `mailto:${profile.email}` : "#";
@@ -246,8 +265,9 @@ export function bodyHTML(projects: Project[], profile: Profile) {
     <div class="keys">
       <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>Drive (arrow keys work too)</span>
       <span><kbd>Shift</kbd></span><span>Boost</span>
-      <span><kbd>E</kbd></span><span>Open the building</span>
-      <span><kbd>F</kbd></span><span>Fly or land (Space up, C down)</span>
+      <span><kbd>F</kbd></span><span>Hold to fly up (Space, Numpad + too)</span>
+      <span><kbd>E</kbd></span><span>Hold to fly down and land (C, Numpad − too)</span>
+      <span><kbd>E</kbd></span><span>On a glowing ring: open the building</span>
       <span><kbd>V</kbd> <kbd>B</kbd></span><span>Next view, next look</span>
     </div>
   </aside>
@@ -326,8 +346,10 @@ export function bodyHTML(projects: Project[], profile: Profile) {
         <h2 class="sv-h" id="svReelH">Showreel</h2>
         <p class="sv-sub">Every project in one video. Pick a chapter to jump straight to it.</p>
         <div class="sv-reelwrap">
-          <div class="sv-media" id="svReel">${PLAY}<small>Showreel coming soon</small></div>
-          <div class="sv-chapters" id="svChapters" role="group" aria-label="Showreel chapters">${chaptersHTML(projects)}</div>
+          <div class="sv-media" id="svReel">${reel.video
+            ? `<video id="svReelVid" src="${esc(reel.video)}" controls playsinline preload="metadata"></video>`
+            : `${PLAY}<small>Showreel coming soon</small>`}</div>
+          <div class="sv-chapters" id="svChapters" role="group" aria-label="Showreel chapters">${chaptersHTML(projects, reel)}</div>
         </div>
       </section>
     </div>
@@ -433,7 +455,7 @@ export function bodyHTML(projects: Project[], profile: Profile) {
   <div id="touch">
     <div class="pad">
       <button type="button" data-k="left" aria-label="Steer left"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></button>
-      <button type="button" id="flyBtn" aria-pressed="false" aria-label="Fly or land" class="fly"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v14M6 9l6-6 6 6M5 21h14"></path></svg><span>Fly</span></button>
+      <div class="alt"><button type="button" data-k="rise" aria-label="Fly up"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"></path></svg>Up</button><button type="button" data-k="sink" aria-label="Fly down"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"></path></svg>Down</button></div>
       <button type="button" data-k="right" aria-label="Steer right"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></button>
     </div>
     <div class="pad">
