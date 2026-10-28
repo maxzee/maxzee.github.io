@@ -617,6 +617,8 @@ function buildArchetype(holder, p, i, col) {
 const BW = 36, BH = 20.25, BY = 9, BZ = HALF + 3.5;
 const PLATE_H = 3.8, BANNER_TOP = BY + BH + 0.4 + PLATE_H, LEG_X = BW * 0.36;
 const BANNER_MID = (BY - 0.4 + BANNER_TOP) / 2, BANNER_HALF_H = (BANNER_TOP - BY + 0.4) / 2 + 0.6;
+/* some banners face straight down the street, some turn a little left or right (lot indices, so neighbours differ) */
+const bannerYaw = (li, lj) => [0, 10, -10, 16, -16][(li * 2 + lj * 3) % 5] * Math.PI / 180;
 function bannerTexture(p) {
   const c = document.createElement("canvas"); c.width = 1024; c.height = 576; const x = c.getContext("2d");
   x.fillStyle = "#0B0F17"; x.fillRect(0, 0, 1024, 576);
@@ -659,12 +661,13 @@ function bannerPlate(g, mat) {
   g.add(front); g.add(back); return front;
 }
 /* solid parts of a banner: the screen only blocks things at its own height, the pylons block at ground level */
-function bannerColliders(c) {
-  colliders.push({ x: c.x, z: c.z + BZ, rx: BW / 2 + 0.6, rz: 0.9, h: BANNER_TOP, y0: BY - 0.4 });
-  [-LEG_X, LEG_X].forEach((dx) => colliders.push({ x: c.x + dx, z: c.z + BZ, rx: 0.9, rz: 0.9, h: BY }));
+function bannerColliders(c, yaw) {
+  const cs = Math.cos(yaw), sn = Math.sin(yaw), rot = yaw || undefined;   /* pylons turn with the banner around its centre */
+  colliders.push({ x: c.x, z: c.z + BZ, rx: BW / 2 + 0.6, rz: 0.9, h: BANNER_TOP, y0: BY - 0.4, rot });
+  [-LEG_X, LEG_X].forEach((dx) => colliders.push({ x: c.x + dx * cs, z: c.z + BZ - dx * sn, rx: 0.9, rz: 0.9, h: BY, rot }));
 }
-function makeBanner(holder, p, i, col) {
-  const g = new THREE.Group(); g.position.set(0, 0, BZ); holder.add(g);
+function makeBanner(holder, p, i, col, yaw) {
+  const g = new THREE.Group(); g.position.set(0, 0, BZ); g.rotation.y = yaw; holder.add(g);
   bannerFrame(g, i);
   const screenMat = new THREE.MeshBasicMaterial({ map: bannerTexture(p) });
   const screen = bannerScreen(g, screenMat, i);
@@ -699,7 +702,7 @@ PROJECTS.forEach((p, i) => {
   const holder = new THREE.Group(); holder.position.copy(c); scene.add(holder);
   const info = buildArchetype(holder, p, i, col);
   /* demo-video banner: a framed billboard in front of each building, facing the road */
-  const banner = makeBanner(holder, p, i, col);
+  const yaw = bannerYaw(li, lj), banner = makeBanner(holder, p, i, col, yaw);
   const label = [p.name, p.engineLabel || "Details coming soon", CSSCOL[p.engine]];
   const tex = { day: labelTexture(...label, "day"), night: labelTexture(...label, "night") };
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex.day, transparent: true, depthWrite: false }));
@@ -708,8 +711,8 @@ PROJECTS.forEach((p, i) => {
   tag.rotation.x = -Math.PI / 2; tag.position.set(c.x - 8, 0.36, c.z + 12.2); scene.add(tag); notBp.push(tag);
   const pad = new THREE.Mesh(new THREE.RingGeometry(4.2, 5.4, 40), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
   pad.rotation.x = -Math.PI / 2; pad.position.set(c.x, 0.08, c.z + PAD_Z); scene.add(pad);
-  buildings.push({ p, i, holder, sprite, pad, center: c, padPos: pad.position.clone(), h: info.top, banner });
-  colliders.push({ x: c.x, z: c.z, rx: HALF + 2.2, rz: HALF + 2.2, h: info.top + 1 }); bannerColliders(c);
+  buildings.push({ p, i, holder, sprite, pad, center: c, padPos: pad.position.clone(), h: info.top, banner, yaw });
+  colliders.push({ x: c.x, z: c.z, rx: HALF + 2.2, rz: HALF + 2.2, h: info.top + 1 }); bannerColliders(c, yaw);
 });
 
 const plazaC = lotCenter(PLAZA_LOT[0], PLAZA_LOT[1]);
@@ -808,14 +811,14 @@ SPECIALS.forEach((sp, k) => {
   const pad = new THREE.Mesh(new THREE.RingGeometry(4.2, 5.4, 40), new THREE.MeshBasicMaterial({ color: sp.color, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
   pad.rotation.x = -Math.PI / 2; pad.position.set(c.x, 0.08, c.z + PAD_Z); scene.add(pad);
   /* info banner in front of the special building, same frame as the project banners */
-  const ig = new THREE.Group(); ig.position.set(0, 0, BZ); holder.add(ig);
+  const yaw = bannerYaw(li, lj), ig = new THREE.Group(); ig.position.set(0, 0, BZ); ig.rotation.y = yaw; holder.add(ig);
   bannerFrame(ig, idx);
   const infoMat = new THREE.MeshBasicMaterial({ map: infoTexture(sp.kind) });
   bannerScreen(ig, infoMat, idx);
   const iplate = bannerPlate(ig, new THREE.MeshBasicMaterial({ map: nameplateTexture({ name: sp.name, engineLabel: sp.sub }, sp.color) }));
   fontsReady.then(() => { infoMat.map = infoTexture(sp.kind); infoMat.needsUpdate = true; iplate.material.map = nameplateTexture({ name: sp.name, engineLabel: sp.sub }, sp.color); iplate.material.needsUpdate = true; });
-  buildings.push({ p: null, special: sp.kind, color: sp.color, i: idx, holder, sprite, pad, center: c, padPos: pad.position.clone(), h: top, banner: { video: null } });
-  colliders.push({ x: c.x, z: c.z, rx: HALF + 2.2, rz: HALF + 2.2, h: top + 1 }); bannerColliders(c);
+  buildings.push({ p: null, special: sp.kind, color: sp.color, i: idx, holder, sprite, pad, center: c, padPos: pad.position.clone(), h: top, banner: { video: null }, yaw });
+  colliders.push({ x: c.x, z: c.z, rx: HALF + 2.2, rz: HALF + 2.2, h: top + 1 }); bannerColliders(c, yaw);
 });
 function relabel() {
   const m = look === "day" ? "day" : "night";
@@ -1366,7 +1369,12 @@ const map = { KeyW: "up", ArrowUp: "up", KeyS: "down", ArrowDown: "down", KeyA: 
 const fly = { on: false, alt: 0, target: 0, vy: 0 };
 const JET_TOP = 2.4;   /* height of the jet's top above its altitude */
 const beneath = (c) => c.y0 !== undefined && fly.alt + JET_TOP < c.y0;
-const insideCollider = (c, x, z) => Math.abs(x - c.x) < c.rx && Math.abs(z - c.z) < c.rz;   /* the one rectangle test every collider check uses */
+/* the one rectangle test every collider check uses; a collider with `rot` (radians, like rotation.y) is tested in its own frame */
+function insideCollider(c, x, z) {
+  let dx = x - c.x, dz = z - c.z;
+  if (c.rot) { const cs = Math.cos(c.rot), sn = Math.sin(c.rot), lx = dx * cs - dz * sn; dz = dx * sn + dz * cs; dx = lx; }
+  return Math.abs(dx) < c.rx && Math.abs(dz) < c.rz;
+}
 function overRoof(x, z) { return colliders.some((c) => !beneath(c) && insideCollider(c, x, z)); }
 /* lowest height the jet may climb to while under a raised banner at (x, z); Infinity when none */
 function ceilingAbove(x, z) { let m = Infinity; for (const c of colliders) if (c.y0 !== undefined && beneath(c) && insideCollider(c, x, z)) m = Math.min(m, c.y0 - JET_TOP - 0.3); return m; }
@@ -1416,7 +1424,7 @@ $("prompt").addEventListener("click", () => { if ($("prompt").dataset.mode === "
 
 /* spectate orbit */
 const orbit = { theta: 0.7, phi: 0.95, r: 190 * SCALE, target: new THREE.Vector3(0, 6, 0), goal: new THREE.Vector3(0, 6, 0), goalR: 190 * SCALE, last: 0 };
-if (window.__ui) window.__city = { state, fly, orbit, camera, buildings, colliders, insideCollider, setFrameCap: (s) => { frameCap = s; } };
+if (window.__ui) window.__city = { THREE, state, fly, orbit, camera, buildings, colliders, insideCollider, setFrameCap: (s) => { frameCap = s; } };
 const ptrs = new Map(); let down = null, pinch0 = 0, r0 = 0;
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 canvas.addEventListener("pointerdown", (e) => {
@@ -1488,7 +1496,7 @@ function focus(i) { const b = buildings[i]; orbit.goal.set(b.center.x, b.h * 0.5
 let camSnap = true;
 function travel(i, open) {
   const b = buildings[i];
-  state.x = b.padPos.x; state.z = b.padPos.z + 3; state.h = Math.PI; state.v = 0; camSnap = true;
+  state.x = b.padPos.x; state.z = b.padPos.z + 3; state.h = Math.PI + b.yaw; state.v = 0; camSnap = true;   /* parked facing the screen */
   if (open) arrive(i);
 }
 hooks.travel = travel; hooks.focus = focus;
@@ -1552,7 +1560,7 @@ function driveTo(i, after) {
   if (fly.on || fly.alt > 0.5) { fly.on = false; fly.target = 0; }
   const b = buildings[i], to = { x: b.padPos.x, z: b.padPos.z + 3 };
   const pts = routeTo(to);
-  if (reduceMotion || pts.length < 2 || Math.hypot(to.x - state.x, to.z - state.z) < 2) { state.x = to.x; state.z = to.z; state.h = Math.PI; state.v = 0; arrive(i); if (after) after(); return; }
+  if (reduceMotion || pts.length < 2 || Math.hypot(to.x - state.x, to.z - state.z) < 2) { state.x = to.x; state.z = to.z; state.h = Math.PI + b.yaw; state.v = 0; arrive(i); if (after) after(); return; }
   const curve = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(p.x, 0, p.z)), false, "centripetal", 0.35);
   const len = curve.getLength();
   auto = { curve, len, u: 0, i, dur: Math.min(8, Math.max(1.6, len / 52)), after, startAlt: fly.alt };
@@ -1562,11 +1570,11 @@ function stepAuto(dt) {
   auto.u = Math.min(1, auto.u + dt / auto.dur);
   const e = ease(auto.u), pt = auto.curve.getPointAt(e), tg = auto.curve.getTangentAt(Math.min(e, 0.999));
   state.x = pt.x; state.z = pt.z;
-  const want = auto.u < 0.88 ? Math.atan2(tg.x, tg.z) : Math.PI, d = angDiff(want, state.h);
+  const want = auto.u < 0.88 ? Math.atan2(tg.x, tg.z) : Math.PI + buildings[auto.i].yaw, d = angDiff(want, state.h);
   state.h += d * Math.min(1, dt * (auto.u < 0.88 ? 7 : 4)); autoBank = Math.max(-1, Math.min(1, d * 2));
   /* gentle hover: lift a little as it sets off, settle as it arrives, follow the road in between */
   const k = Math.min(1, auto.u / 0.15, (1 - auto.u) / 0.15); autoAlt = 2.4 * ease(Math.max(0, k)) + auto.startAlt * (1 - Math.min(1, auto.u / 0.35));
-  if (auto.u >= 1) { const a = auto; auto = null; autoAlt = 0; autoBank = 0; state.h = Math.PI; document.body.classList.remove("autodrive"); arrive(a.i); if (a.after) a.after(); }
+  if (auto.u >= 1) { const a = auto; auto = null; autoAlt = 0; autoBank = 0; state.h = Math.PI + buildings[a.i].yaw; document.body.classList.remove("autodrive"); arrive(a.i); if (a.after) a.after(); }
 }
 function cancelAuto() { if (auto) { auto = null; autoAlt = 0; autoBank = 0; document.body.classList.remove("autodrive"); } }
 hooks.driveTo = driveTo;
@@ -1644,8 +1652,16 @@ setTimeout(() => $("loader").classList.add("gone"), reduceMotion ? 0 : 700);
 /* loop */
 let last = performance.now(), t = 0, frameCap = null;   /* frameCap: debug only, forces every frame's dt */
 const camPos = new THREE.Vector3(), look3 = new THREE.Vector3(), bannerAim = new THREE.Vector3(), fitPos = new THREE.Vector3(); let frame = 0;
-/* the building straight across the street from building i (one PITCH further along z); Task 6 generalises this */
-const acrossOf = (i) => { const c = buildings[i] && buildings[i].center; return c ? buildings.find((o) => o.center && o.center.x === c.x && o.center.z === c.z + PITCH) : undefined; };
+/* every other building whose footprint the line from `cam` to building i's banner centre passes through (so it would block the framed view) */
+function occludersOf(i, cam) {
+  const b = buildings[i]; if (!b) return [];
+  const ex = b.center.x, ez = b.center.z + BZ, n = Math.ceil(Math.hypot(cam.x - ex, cam.z - ez) / 1.5) + 1;
+  return buildings.filter((o) => {
+    if (o === b) return false;
+    for (let k = 0; k <= n; k++) { const f = k / n; if (Math.abs(cam.x + (ex - cam.x) * f - o.center.x) < HALF + 2.2 && Math.abs(cam.z + (ez - cam.z) * f - o.center.z) < HALF + 2.2) return true; }
+    return false;
+  });
+}
 let hiddenAcross = [];
 /* hide exactly the buildings in `list` (and restore any previously hidden ones no longer listed) */
 function setHidden(list) {
@@ -1712,13 +1728,13 @@ function step(now) {
     /* parked: frame the whole banner and its nameplate, square on, at the distance where it just fits the screen
        (the building across the street may contain the camera; its walls face away, so it does not block the view) */
     const fitW = arrivedIdx >= 0 ? frame : 0;   /* only an actual arrival frames the banner; merely passing a pad keeps the chase camera */
-    const ac = fitW > 0.5 ? acrossOf(arrivedIdx) : undefined; setHidden(ac ? [ac] : []);
     if (fitW > 0.01) {
       const b = buildings[arrivedIdx], tv = Math.tan(camera.fov * Math.PI / 360), th = tv * camera.aspect;
       const d = Math.max(BANNER_HALF_H / tv, (BW / 2 + 0.8) / th) * 1.24;
       bannerAim.set(b.center.x, BANNER_MID + 1.4, b.center.z + BZ);   /* aim a little high so the header never covers the nameplate */
-      fitPos.set(b.center.x, BANNER_MID + 1.5, b.center.z + BZ + d); camPos.lerp(fitPos, fitW);
+      fitPos.set(b.center.x + Math.sin(b.yaw) * d, BANNER_MID + 1.5, b.center.z + BZ + Math.cos(b.yaw) * d); camPos.lerp(fitPos, fitW);   /* along the banner's normal: square on */
     }
+    setHidden(fitW > 0.5 ? occludersOf(arrivedIdx, fitPos) : []);
     if (camSnap) { camera.position.copy(camPos); camSnap = false; } else camera.position.lerp(camPos, 1 - Math.pow(auto ? 0.0002 : 0.002, rawDt));
     look3.set(state.x + fx * 12, 5 + alt * 0.85, state.z + fz * 12);
     if (fitW > 0.01) look3.lerp(bannerAim, fitW);
