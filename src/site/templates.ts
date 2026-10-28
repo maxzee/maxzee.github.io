@@ -27,6 +27,7 @@ export interface SourceProject {
   full: string;
   poster: string;
   character: string;
+  wraps: string[];
   talk: string[];
 }
 
@@ -46,7 +47,7 @@ export interface Project {
   results: string;
   stack: [string, string][];
   // video: the whole clip with sound; loop: the short silent clip for banners
-  media: { video: string; loop: string; poster: string; character: string };
+  media: { video: string; loop: string; poster: string; character: string; wraps: string[] };
   talk: string[];
   links: { label: string; href: string }[];
   visibility: SourceProject["visibility"];
@@ -104,7 +105,7 @@ export function toProject(p: SourceProject): Project {
     built: p.built,
     results: p.results.join(", "),
     stack: p.stack,
-    media: { video: p.full || p.preview, loop: p.preview, poster: p.poster, character: p.character },
+    media: { video: p.full || p.preview, loop: p.preview, poster: p.poster, character: p.character, wraps: p.wraps ?? [] },
     talk: p.talk,
     links: p.links,
     visibility: p.visibility,
@@ -437,6 +438,9 @@ export function bodyHTML(projects: Project[], profile: Profile, reel: Showreel) 
     </div>
   </div>
 
+  <div id="theater" aria-label="Project video">
+    <video id="thVid" controls playsinline preload="none"></video>
+  </div>
   <aside id="card" class="panel" role="dialog" aria-modal="false" aria-labelledby="cTitle">
     <div class="card-top">
       <div><h2 id="cTitle"></h2><div class="meta" id="cMeta"></div></div>

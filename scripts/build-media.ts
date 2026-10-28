@@ -60,6 +60,18 @@ for (const { project, dir } of entries) {
     made++;
   }
 
+  // three stills from across the video, used to wrap the building in the game's own art
+  for (const [k, at] of [0.3, 0.55, 0.8].entries()) {
+    const wrap = join(outDir, `wrap-${k + 1}.webp`);
+    if (!force && existsSync(wrap)) continue;
+    run([
+      "-ss", (length * at).toFixed(2), "-i", source, "-frames:v", "1",
+      "-vf", "scale=512:288:force_original_aspect_ratio=increase:flags=lanczos,crop=512:288",
+      "-c:v", "libwebp", "-quality", "72", wrap,
+    ]);
+    made++;
+  }
+
   // the whole video, with sound, for the project cards and the 1-page site
   if (force || !existsSync(full)) {
     run([

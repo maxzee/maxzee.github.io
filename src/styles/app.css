@@ -453,3 +453,12 @@ body.touch #prompt{bottom:96px} body.touch #prompt kbd{display:none}
   body.touch.view-drive #card{bottom:92px; max-height:50%}
 }
 @media (prefers-reduced-motion: reduce){ #loader{transition:none} .seg button.new::after{animation:none} }
+
+/* theater: clicking a banner plays its video large, beside the project panel */
+#theater{position:absolute; z-index:39; left:0; top:0; bottom:0; right:440px; display:none; align-items:center; justify-content:center; padding:84px 28px 28px; background:rgba(5,8,14,.86)}
+body.theater:not(.view-simple) #theater{display:flex}
+#theater video{width:100%; max-height:100%; aspect-ratio:16/9; object-fit:contain; background:#000; border-radius:12px; box-shadow:0 18px 60px rgba(0,0,0,.55)}
+body.theater #lower, body.theater #act, body.theater .lb, body.theater #prompt{display:none !important}
+#scene.can-click{cursor:pointer}
+@media (max-width:900px){ #theater{right:0; bottom:58%; padding:64px 12px 10px} }
+@media (max-height:520px) and (orientation:landscape){ #theater{right:56%; bottom:0; padding:54px 10px 10px} }

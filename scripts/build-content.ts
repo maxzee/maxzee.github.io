@@ -56,7 +56,8 @@ function publishedMedia(id: string, dir: string, character?: string) {
       copyFileSync(source, at("character.glb"));
     }
   }
-  return { preview: url("preview.mp4"), full: url("full.mp4"), poster: url("poster.webp"), character: url("character.glb") };
+  const wraps = [1, 2, 3].map((k) => url(`wrap-${k}.webp`)).filter(Boolean);
+  return { preview: url("preview.mp4"), full: url("full.mp4"), poster: url("poster.webp"), character: url("character.glb"), wraps };
 }
 
 function loadProjects() {

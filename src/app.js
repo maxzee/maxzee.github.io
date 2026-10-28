@@ -66,7 +66,21 @@ function cine(i) {
 }
 let arrivedIdx = -1;
 function showDetails(i) { if (i < PROJECTS.length) openCard(i); else openSpecial(SPECIALS[i - PROJECTS.length].kind); document.body.classList.add("paneled"); }
-function leaveArrival() { arrivedIdx = -1; document.body.classList.remove("cine", "arrived", "paneled"); }
+function leaveArrival() { arrivedIdx = -1; endTheater(); document.body.classList.remove("cine", "arrived", "paneled"); }
+/* theater: a banner's video played large, with the project panel beside it */
+function openTheater(i) {
+  const p = i < PROJECTS.length ? PROJECTS[i] : null;
+  if (view === "simple" || !p || !p.media.video) { showDetails(i); return; }
+  document.body.classList.add("theater");
+  showDetails(i);
+  const v = $("thVid");
+  if (v.dataset.i !== String(i)) { v.src = p.media.video; v.poster = p.media.poster || ""; v.dataset.i = String(i); }
+  v.play().catch(() => {});
+}
+function endTheater() {
+  if (!document.body.classList.contains("theater")) return;
+  document.body.classList.remove("theater"); $("thVid").pause();
+}
 function actBtn(label, fn, primary, href) {
   const el = document.createElement(href ? "a" : "button"); el.className = "btn" + (primary ? " primary" : "");
   if (href) { el.href = href; if (/^http/.test(href)) { el.target = "_blank"; el.rel = "noopener"; } } else { el.type = "button"; el.addEventListener("click", fn); }
@@ -80,7 +94,8 @@ function arrive(i) {
   const act = $("act"); act.innerHTML = "";
   if (i < PROJECTS.length) {
     const p = PROJECTS[i], nx = (i + 1) % PROJECTS.length;
-    act.append(actBtn("See full project details", () => showDetails(i), true));
+    if (p.media.video) { act.append(actBtn("▶ Watch the video", () => openTheater(i), true)); act.append(actBtn("Project details", () => showDetails(i))); }
+    else act.append(actBtn("See full project details", () => showDetails(i), true));
     if (p.links.length) act.append(actBtn(p.links[0].label, null, false, p.links[0].href));
     if (!document.body.classList.contains("touring")) act.append(actBtn("Next: " + PROJECTS[nx].name + " →", () => goTo(nx)));
   } else if (SPECIALS[i - PROJECTS.length].kind === "about") {
@@ -125,7 +140,8 @@ function openCard(i) {
     h += '<dl class="facts"><dt>Role</dt><dd>' + esc(p.role) + "</dd></dl>";
     if (p.stack.length) h += '<div class="meta">How I built it, top layer first</div><div class="stack">' + p.stack.map((s) => "<div><b>" + esc(s[0]) + "</b><span>" + esc(s[1]) + "</span></div>").join("") + "</div>";
   } else {
-    if (p.media.video) h += '<div class="media"><video src="' + esc(p.media.video) + '" ' + (p.media.poster ? 'poster="' + esc(p.media.poster) + '" ' : "") + "controls playsinline preload=\"metadata\"></video></div>";
+    if (document.body.classList.contains("theater")) h += "";
+    else if (p.media.video) h += '<div class="media"><video src="' + esc(p.media.video) + '" ' + (p.media.poster ? 'poster="' + esc(p.media.poster) + '" ' : "") + "controls playsinline preload=\"metadata\"></video></div>";
     else if (p.media.poster) h += '<div class="media"><img src="' + esc(p.media.poster) + '" alt="' + esc(p.name) + ' screenshot"></div>';
     else h += '<div class="media">Footage coming soon</div>';
     if (p.summary) h += '<p class="note">' + esc(p.summary) + "</p>";
@@ -138,7 +154,7 @@ function openCard(i) {
 }
 function closeCard() {
   const hadPanel = $("card").classList.contains("show");
-  $("card").classList.remove("show"); $("shade").classList.remove("show"); cardIndex = -1; document.body.classList.remove("paneled");
+  $("card").classList.remove("show"); $("shade").classList.remove("show"); cardIndex = -1; document.body.classList.remove("paneled"); endTheater();
   if (!hadPanel || view === "simple" || arrivedIdx < 0) leaveArrival();
 }
 function goTo(i) {
@@ -406,26 +422,113 @@ for (let i = 0; i < NX; i++) for (let j = 0; j < NZ; j++) {
   const loop = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), plotLineMat); world.add(loop); dayOnly.push(loop);
 }
 
-/* facade textures */
-function windowTexture(seed, mode) {
-  const c = document.createElement("canvas"); c.width = 128; c.height = 256; const x = c.getContext("2d");
-  let s = seed; const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-  if (mode === "day") {
-    x.fillStyle = "#EAD9BF"; x.fillRect(0, 0, 128, 256);
-    for (let r = 0; r < 16; r++) for (let q = 0; q < 6; q++) {
-      const v = rnd(); x.fillStyle = v > 0.7 ? "#7FA7C6" : "#46667F"; x.fillRect(8 + q * 20, 5 + r * 16, 12, 10);
-      x.fillStyle = "rgba(255,255,255,.35)"; x.fillRect(8 + q * 20, 5 + r * 16, 3, 10);
+/* ---------- facades: every building is wrapped in its own game's art ----------
+   Projects with footage use three stills from their video (wrap-1..3); the others get a drawn theme in the game's colours.
+   Each face samples a cover-fit window of a 16:9 texture, so the art is never stretched. */
+const WRAP_W = 512, WRAP_H = 288, WRAP_ASPECT = WRAP_W / WRAP_H;
+const THEMES = {
+  "kick-arena": { bg: ["#1F8A44", "#187236"], fg: "#FFFFFF", pattern: "pitch" },
+  "kungfu-karate": { bg: ["#C62F24", "#7E1810"], fg: "#FFD24A", pattern: "rays" },
+  "reader-bee": { bg: ["#FFC93C", "#F2A900"], fg: "#1C1C1C", pattern: "honeycomb" },
+  "boba-tea": { bg: ["#F7B9CB", "#EE96B0"], fg: "#5A3420", pattern: "pearls" },
+  "bank-manager": { bg: ["#1F2D4A", "#14203A"], fg: "#FFD24A", pattern: "coins" },
+  "bank-atm": { bg: ["#127C86", "#0B5D66"], fg: "#FFFFFF", pattern: "cards" },
+  "virtual-mom": { bg: ["#FFC9A8", "#F59E8B"], fg: "#7A2E4A", pattern: "hearts" },
+};
+function drawPattern(x, kind, fg, seed) {
+  let r = seed; const rnd = () => { r = (r * 9301 + 49297) % 233280; return r / 233280; };
+  x.save(); x.globalAlpha = 0.22; x.fillStyle = fg; x.strokeStyle = fg; x.lineWidth = 4;
+  if (kind === "pitch") {
+    x.globalAlpha = 0.12; for (let k = 0; k < WRAP_W; k += 64) x.fillRect(k, 0, 32, WRAP_H);
+    x.globalAlpha = 0.5; x.strokeRect(14, 14, WRAP_W - 28, WRAP_H - 28); x.beginPath(); x.moveTo(WRAP_W / 2, 14); x.lineTo(WRAP_W / 2, WRAP_H - 14); x.stroke();
+    x.beginPath(); x.arc(WRAP_W / 2, WRAP_H / 2, 46, 0, Math.PI * 2); x.stroke();
+  } else if (kind === "rays") {
+    for (let k = 0; k < 18; k += 2) {
+      const a0 = k / 18 * Math.PI * 2, a1 = (k + 1) / 18 * Math.PI * 2;
+      x.beginPath(); x.moveTo(WRAP_W / 2, WRAP_H / 2); x.lineTo(WRAP_W / 2 + Math.cos(a0) * 600, WRAP_H / 2 + Math.sin(a0) * 600); x.lineTo(WRAP_W / 2 + Math.cos(a1) * 600, WRAP_H / 2 + Math.sin(a1) * 600); x.closePath(); x.fill();
+    }
+  } else if (kind === "honeycomb") {
+    const R = 22, w = R * Math.sqrt(3);
+    for (let row = -1; row < WRAP_H / (R * 1.5) + 1; row++) for (let col = -1; col < WRAP_W / w + 1; col++) {
+      const cx = col * w + (row % 2 ? w / 2 : 0), cy = row * R * 1.5; x.beginPath();
+      for (let k = 0; k < 6; k++) { const a = Math.PI / 6 + k * Math.PI / 3; if (k) x.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); else x.moveTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); }
+      x.closePath(); x.stroke();
+    }
+  } else if (kind === "pearls") {
+    for (let k = 0; k < 70; k++) { x.beginPath(); x.arc(rnd() * WRAP_W, rnd() * WRAP_H, 6 + rnd() * 8, 0, Math.PI * 2); x.fill(); }
+  } else if (kind === "coins") {
+    x.font = "700 30px Rajdhani, sans-serif"; x.textAlign = "center"; x.textBaseline = "middle";
+    for (let k = 0; k < 26; k++) { const cx = rnd() * WRAP_W, cy = rnd() * WRAP_H; x.beginPath(); x.arc(cx, cy, 20, 0, Math.PI * 2); x.stroke(); x.fillText("$", cx, cy + 1); }
+  } else if (kind === "cards") {
+    for (let k = 0; k < 16; k++) { const cx = rnd() * WRAP_W, cy = rnd() * WRAP_H; x.save(); x.translate(cx, cy); x.rotate((rnd() - 0.5) * 0.8); x.strokeRect(-34, -21, 68, 42); x.fillRect(-26, -8, 16, 12); x.restore(); }
+  } else if (kind === "hearts") {
+    for (let k = 0; k < 22; k++) {
+      const cx = rnd() * WRAP_W, cy = rnd() * WRAP_H, z = 8 + rnd() * 10; x.beginPath();
+      x.moveTo(cx, cy + z); x.bezierCurveTo(cx - z * 2, cy - z / 2, cx - z / 2, cy - z * 1.6, cx, cy - z / 3); x.bezierCurveTo(cx + z / 2, cy - z * 1.6, cx + z * 2, cy - z / 2, cx, cy + z); x.fill();
     }
   } else {
-    x.fillStyle = "#1B2338"; x.fillRect(0, 0, 128, 256);
-    for (let r = 0; r < 16; r++) for (let q = 0; q < 6; q++) { const v = rnd(); x.fillStyle = v > 0.62 ? "#FFD98A" : v > 0.5 ? "#9FE3FF" : "#2A3350"; x.fillRect(8 + q * 20, 6 + r * 16, 12, 9); }
+    x.globalAlpha = 0.14;
+    for (let k = -WRAP_H; k < WRAP_W; k += 40) { x.beginPath(); x.moveTo(k, WRAP_H); x.lineTo(k + WRAP_H, 0); x.lineTo(k + WRAP_H + 18, 0); x.lineTo(k + 18, WRAP_H); x.closePath(); x.fill(); }
   }
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+  x.restore();
 }
-function facadeMats(seed, w, h) {
-  const td = windowTexture(seed, "day"), tn = windowTexture(seed, "night");
-  [td, tn].forEach((t) => t.repeat.set(Math.max(1, w / 11), Math.max(1, h / 16)));
-  return { day: new THREE.MeshStandardMaterial({ map: td, roughness: 0.85 }), night: new THREE.MeshStandardMaterial({ map: tn, emissiveMap: tn, emissive: 0xffffff, emissiveIntensity: 0.55, roughness: 0.8 }) };
+/* the drawn theme: game colours, a motif, and the game's name large in the middle (the centre survives every crop) */
+function drawTheme(x, p, k) {
+  const th = THEMES[p.id] || { bg: [CSSCOL[p.engine], "#14213D"], fg: "#FFFFFF", pattern: "stripes" };
+  const g = x.createLinearGradient(0, 0, 0, WRAP_H); g.addColorStop(0, th.bg[0]); g.addColorStop(1, th.bg[1]);
+  x.fillStyle = g; x.fillRect(0, 0, WRAP_W, WRAP_H);
+  drawPattern(x, th.pattern, th.fg, 17 + k * 31 + p.id.length * 7);
+  x.save(); x.textAlign = "center"; x.textBaseline = "middle"; x.fillStyle = th.fg;
+  x.shadowColor = "rgba(0,0,0,.35)"; x.shadowBlur = 10;
+  const words = p.name.toUpperCase().split(" "), half = Math.ceil(words.length / 2);
+  const lines = words.length > 1 && p.name.length > 10 ? [words.slice(0, half).join(" "), words.slice(half).join(" ")] : [words.join(" ")];
+  x.font = '400 ' + (lines.length > 1 ? 54 : 62) + 'px "Russo One", sans-serif';
+  lines.forEach((l, n) => x.fillText(l, WRAP_W / 2, WRAP_H / 2 + (n - (lines.length - 1) / 2) * 60, WRAP_W - 40));
+  x.restore();
+}
+/* a still from the game, with a faint curtain-wall grid so it still reads as a building */
+function drawStill(x, img) {
+  const s = Math.max(WRAP_W / img.width, WRAP_H / img.height), w = img.width * s, h = img.height * s;
+  x.drawImage(img, (WRAP_W - w) / 2, (WRAP_H - h) / 2, w, h);
+  x.fillStyle = "rgba(10,14,24,.28)";
+  for (let k = 0; k < WRAP_W; k += 32) x.fillRect(k, 0, 2, WRAP_H);
+  for (let k = 0; k < WRAP_H; k += 36) x.fillRect(0, k, WRAP_W, 2);
+  const g = x.createLinearGradient(0, 0, WRAP_W, WRAP_H); g.addColorStop(0, "rgba(255,255,255,.14)"); g.addColorStop(0.5, "rgba(255,255,255,0)");
+  x.fillStyle = g; x.fillRect(0, 0, WRAP_W, WRAP_H);
+}
+/* three wrap textures per project, shared by all of its building parts */
+const wrapSets = [];
+function wrapSet(i) {
+  if (wrapSets[i]) return wrapSets[i];
+  const p = PROJECTS[i], set = { day: [], night: [] };
+  for (let k = 0; k < 3; k++) {
+    const c = document.createElement("canvas"); c.width = WRAP_W; c.height = WRAP_H; const x = c.getContext("2d");
+    const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4; let still = false;
+    drawTheme(x, p, k);
+    fontsReady.then(() => { if (!still) { drawTheme(x, p, k); tex.needsUpdate = true; } });
+    const url = p.media.wraps.length ? p.media.wraps[k % p.media.wraps.length] : "";
+    if (url) { const img = new Image(); img.onload = () => { still = true; drawStill(x, img); tex.needsUpdate = true; }; img.src = url; }
+    set.day.push(new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }));
+    set.night.push(new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.6, color: 0x6a7080, roughness: 0.8 }));
+  }
+  return (wrapSets[i] = set);
+}
+/* facade of building i, variation k: part() turns this into per-face materials */
+function facadeMats(i, k) { return { wrap: { i, k } }; }
+/* crop each side face of a box to a cover-fit window of the 16:9 art (faces 0,1 = sides, 4,5 = front and back) */
+function fitBoxUV(geo) {
+  const { width: W, height: H, depth: D } = geo.parameters, uv = geo.attributes.uv;
+  [[0, D, H], [1, D, H], [4, W, H], [5, W, H]].forEach(([f, fw, fh]) => {
+    const af = fw / fh, su = af > WRAP_ASPECT ? 1 : af / WRAP_ASPECT, sv = af > WRAP_ASPECT ? WRAP_ASPECT / af : 1;
+    for (let v = f * 4; v < f * 4 + 4; v++) uv.setXY(v, 0.5 + (uv.getX(v) - 0.5) * su, 0.5 + (uv.getY(v) - 0.5) * sv);
+  });
+  uv.needsUpdate = true;
+}
+/* box material order: +x, -x, top, bottom, +z (street side), -z */
+function wrapMats({ i, k }, geo) {
+  fitBoxUV(geo);
+  const set = wrapSet(i), faces = (m, roof) => [m[(k + 1) % 3], m[(k + 2) % 3], roof, roof, m[k % 3], m[(k + 1) % 3]];
+  return { day: faces(set.day, roofMats.day), night: faces(set.night, roofMats.night) };
 }
 const roofMats = { day: new THREE.MeshStandardMaterial({ color: 0xD6C7AE, roughness: 1 }), night: new THREE.MeshStandardMaterial({ color: 0x2A3550, roughness: 0.9 }) };
 const detailMats = { day: new THREE.MeshStandardMaterial({ color: 0xBDB6AA, roughness: 0.8 }), night: new THREE.MeshStandardMaterial({ color: 0x222B42 }) };
@@ -451,6 +554,7 @@ function plotTag(n, color) {
 /* building archetypes */
 const buildings = [], colliders = [], pickables = [];
 function part(holder, geo, x, y, z, mats, pickIndex) {
+  if (mats.wrap) mats = wrapMats(mats.wrap, geo);
   const m = dual(new THREE.Mesh(geo, mats.day), mats.day, mats.night); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
   withEdges(m); holder.add(m); if (pickIndex !== undefined) { m.userData.i = pickIndex; pickables.push(m); } return m;
 }
@@ -460,7 +564,7 @@ function buildArchetype(holder, p, i, col) {
   const accentMats = { day: new THREE.MeshStandardMaterial({ color: col, roughness: 0.6 }), night: new THREE.MeshBasicMaterial({ color: col }) };
   let top = h, screenZ = HALF, screenW = HALF * 1.5;
   if (style === "tower") {
-    const f1 = facadeMats(seed, 22, h * 0.55), f2 = facadeMats(seed + 1, 17, h * 0.3), f3 = facadeMats(seed + 2, 11, h * 0.15);
+    const f1 = facadeMats(i, 0), f2 = facadeMats(i, 1), f3 = facadeMats(i, 2);
     part(holder, new THREE.BoxGeometry(22, h * 0.55, 22), 0, h * 0.275, 0, f1, i);
     part(holder, new THREE.BoxGeometry(17, h * 0.3, 17), 0, h * 0.55 + h * 0.15, 0, f2, i);
     part(holder, new THREE.BoxGeometry(11, h * 0.15, 11), 0, h * 0.85 + h * 0.075, 0, f3, i);
@@ -468,7 +572,7 @@ function buildArchetype(holder, p, i, col) {
     part(holder, new THREE.BoxGeometry(11.4, 0.8, 11.4), 0, h * 0.85, 0, accentMats);
     part(holder, new THREE.CylinderGeometry(0.25, 0.6, 7, 6), 0, h + 3.5, 0, detailMats); top = h + 7;
   } else if (style === "mall") {
-    const hh = Math.min(h, 12), f = facadeMats(seed, 22, hh);
+    const hh = Math.min(h, 12), f = facadeMats(i, 0);
     part(holder, new THREE.BoxGeometry(22, hh, 22), 0, hh / 2, 0, f, i);
     part(holder, new THREE.BoxGeometry(22.4, 1.2, 22.4), 0, hh - 0.6, 0, accentMats);
     part(holder, new THREE.BoxGeometry(18, 4, 0.4), 0, 2, HALF + 0.25, glassMats);
@@ -476,7 +580,7 @@ function buildArchetype(holder, p, i, col) {
     for (let k = 0; k < 4; k++) part(holder, new THREE.BoxGeometry(2.2, 1.4, 2.2), -6 + k * 4, hh + 1.3, -4, detailMats);
     top = hh + 2; screenZ = HALF + 0.3; screenW = 12;
   } else if (style === "courtyard") {
-    const hh = Math.min(h, 14), fA = facadeMats(seed, 22, hh), fB = facadeMats(seed + 1, 9, hh);
+    const hh = Math.min(h, 14), fA = facadeMats(i, 0), fB = facadeMats(i, 1);
     part(holder, new THREE.BoxGeometry(22, hh, 9), 0, hh / 2, -6.5, fA, i);
     part(holder, new THREE.BoxGeometry(9, hh, 13), -6.5, hh / 2, 4.5, fB, i);
     part(holder, new THREE.BoxGeometry(9, hh * 0.6, 13), 6.5, hh * 0.3, 4.5, fB, i);
@@ -484,13 +588,13 @@ function buildArchetype(holder, p, i, col) {
     part(holder, new THREE.BoxGeometry(4, 0.3, 4), 0, 0.5, 5, detailMats);
     top = hh + 1;
   } else if (style === "stepped") {
-    const f1 = facadeMats(seed, 22, h * 0.5), f2 = facadeMats(seed + 1, 16, h * 0.5);
+    const f1 = facadeMats(i, 0), f2 = facadeMats(i, 1);
     part(holder, new THREE.BoxGeometry(22, h * 0.5, 22), 0, h * 0.25, 0, f1, i);
     part(holder, new THREE.BoxGeometry(16, h * 0.5, 14), -3, h * 0.75, -4, f2, i);
     part(holder, new THREE.BoxGeometry(22.4, 0.7, 22.4), 0, h * 0.5 + 0.35, 0, accentMats);
     part(holder, new THREE.CylinderGeometry(1.6, 1.6, 3, 12), 5, h * 0.5 + 2, 5, detailMats);
   } else {
-    const f = facadeMats(seed, 22, h);
+    const f = facadeMats(i, 0);
     part(holder, new THREE.BoxGeometry(22, h, 22), 0, h / 2, 0, f, i);
     part(holder, new THREE.BoxGeometry(22.6, 0.9, 22.6), 0, h + 0.45, 0, accentMats);
     part(holder, new THREE.BoxGeometry(5, 2, 3), -5, h + 1.9, -5, detailMats);
@@ -501,8 +605,11 @@ function buildArchetype(holder, p, i, col) {
 }
 
 /* ---------- demo-video banners ---------- */
-const BW = 22, BH = 12.4, BY = 8, BZ = HALF + 2;     /* screen size, bottom height, distance in front of building: big and raised so it reads from far away */
-const PLATE_H = 2.4, BANNER_TOP = BY + BH + 0.4 + PLATE_H;
+/* Banners carry the content; buildings are scenery. Each screen is as wide as the block allows (neighbours sit 46 apart),
+   raised on pylons so the jet, traffic and the character pass underneath, and double-sided so it reads from both streets. */
+const BW = 36, BH = 20.25, BY = 9, BZ = HALF + 3.5;
+const PLATE_H = 3.8, BANNER_TOP = BY + BH + 0.4 + PLATE_H, LEG_X = BW * 0.36;
+const BANNER_MID = (BY - 0.4 + BANNER_TOP) / 2, BANNER_HALF_H = (BANNER_TOP - BY + 0.4) / 2 + 0.6;
 function bannerTexture(p) {
   const c = document.createElement("canvas"); c.width = 1024; c.height = 576; const x = c.getContext("2d");
   x.fillStyle = "#0B0F17"; x.fillRect(0, 0, 1024, 576);
@@ -521,19 +628,40 @@ function nameplateTexture(p, col) {
   x.fillStyle = "#0B0F17"; x.font = "700 56px Rajdhani, sans-serif"; x.textBaseline = "middle";
   let n = p.name; while (x.measureText(n).width > 760 && n.length > 4) n = n.slice(0, -2); if (n !== p.name) n = n.trim() + "…";
   x.fillText(n, 32, 60);
-  x.textAlign = "right"; x.font = "700 40px Rajdhani, sans-serif"; x.fillText(p.engineLabel || "", 992, 60);
+  x.textAlign = "right"; x.font = "700 40px Rajdhani, sans-serif"; x.fillText(p.media && p.media.video ? "▶  CLICK TO WATCH" : (p.engineLabel || ""), 992, 60);
   const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
 }
 const frameMats = { day: new THREE.MeshStandardMaterial({ color: 0x2B3038, metalness: 0.4, roughness: 0.5 }), night: new THREE.MeshStandardMaterial({ color: 0x1A1F2A, metalness: 0.4, roughness: 0.5 }) };
-const legGeo = new THREE.BoxGeometry(0.6, BY, 0.6);
+const legGeo = new THREE.BoxGeometry(1.1, BY, 1.1);
+/* frame + pylons; every banner part is clickable and opens the video player */
+const bannerPicks = [];
+function bannerFrame(g, i) {
+  bannerPicks.push(part(g, new THREE.BoxGeometry(BW + 0.8, BH + 0.8, 0.6), 0, BY + BH / 2, 0, frameMats, i));
+  part(g, legGeo, -LEG_X, BY / 2, 0, frameMats); part(g, legGeo, LEG_X, BY / 2, 0, frameMats);
+}
+/* the same picture on the front and the back (a plane turned round reads correctly from behind) */
+function bannerScreen(g, mat, i) {
+  const geo = new THREE.PlaneGeometry(BW, BH), front = new THREE.Mesh(geo, mat), back = new THREE.Mesh(geo, mat);
+  front.position.set(0, BY + BH / 2, 0.31); back.position.set(0, BY + BH / 2, -0.31); back.rotation.y = Math.PI;
+  [front, back].forEach((m) => { m.userData.i = i; g.add(m); pickables.push(m); bannerPicks.push(m); });
+  return front;
+}
+function bannerPlate(g, mat) {
+  const geo = new THREE.PlaneGeometry(BW + 0.8, PLATE_H), front = new THREE.Mesh(geo, mat), back = new THREE.Mesh(geo, mat);
+  front.position.set(0, BY + BH + 0.4 + PLATE_H / 2, 0.05); back.position.set(0, BY + BH + 0.4 + PLATE_H / 2, -0.05); back.rotation.y = Math.PI;
+  g.add(front); g.add(back); return front;
+}
+/* solid parts of a banner: the screen only blocks things at its own height, the pylons block at ground level */
+function bannerColliders(c) {
+  colliders.push({ x: c.x, z: c.z + BZ, rx: BW / 2 + 0.6, rz: 0.9, h: BANNER_TOP, y0: BY - 0.4 });
+  [-LEG_X, LEG_X].forEach((dx) => colliders.push({ x: c.x + dx, z: c.z + BZ, rx: 0.9, rz: 0.9, h: BY }));
+}
 function makeBanner(holder, p, i, col) {
   const g = new THREE.Group(); g.position.set(0, 0, BZ); holder.add(g);
-  part(g, new THREE.BoxGeometry(BW + 0.8, BH + 0.8, 0.6), 0, BY + BH / 2, 0, frameMats, i);
-  part(g, legGeo, -BW * 0.32, BY / 2, 0, frameMats); part(g, legGeo, BW * 0.32, BY / 2, 0, frameMats);
+  bannerFrame(g, i);
   const screenMat = new THREE.MeshBasicMaterial({ map: bannerTexture(p) });
-  const screen = new THREE.Mesh(new THREE.PlaneGeometry(BW, BH), screenMat); screen.position.set(0, BY + BH / 2, 0.31); g.add(screen);
-  const plate = new THREE.Mesh(new THREE.PlaneGeometry(BW + 0.8, PLATE_H), new THREE.MeshBasicMaterial({ map: nameplateTexture(p, CSSCOL[p.engine]) }));
-  plate.position.set(0, BY + BH + 0.4 + PLATE_H / 2, 0.05); g.add(plate);
+  const screen = bannerScreen(g, screenMat, i);
+  const plate = bannerPlate(g, new THREE.MeshBasicMaterial({ map: nameplateTexture(p, CSSCOL[p.engine]) }));
   let video = null;
   if (p.media.loop) {
     video = document.createElement("video"); video.src = p.media.loop; video.muted = true; video.loop = true; video.playsInline = true; video.crossOrigin = "anonymous"; video.preload = "none";
@@ -553,7 +681,7 @@ function updateBanners() {
   buildings.forEach((b) => {
     const bn = b.banner; if (!bn.video) return;
     bn.group.getWorldPosition(bn.world);
-    const close = view !== "simple" && camera.position.distanceTo(bn.world) < 110;
+    const close = view !== "simple" && camera.position.distanceTo(bn.world) < 150;
     if (close && !bn.playing) { bn.playing = true; bn.screenMat.map = bn.screen.userData.videoTex; bn.screenMat.needsUpdate = true; bn.video.play().catch(() => { bn.playing = false; }); }
     else if (!close && bn.playing) { bn.playing = false; bn.video.pause(); }
   });
@@ -568,13 +696,13 @@ PROJECTS.forEach((p, i) => {
   const label = [p.name, p.engineLabel || "Details coming soon", CSSCOL[p.engine]];
   const tex = { day: labelTexture(...label, "day"), night: labelTexture(...label, "night") };
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex.day, transparent: true, depthWrite: false }));
-  sprite.scale.set(16, 4, 1); sprite.position.set(c.x, info.top + 6, c.z); sprite.userData = { label, tex }; scene.add(sprite);
+  sprite.scale.set(16, 4, 1); sprite.position.set(c.x, Math.max(info.top, BANNER_TOP) + 5, c.z); sprite.userData = { label, tex }; scene.add(sprite);
   const tag = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), new THREE.MeshBasicMaterial({ map: plotTag(i + 1, CSSCOL[p.engine]), transparent: true }));
   tag.rotation.x = -Math.PI / 2; tag.position.set(c.x - 8, 0.36, c.z + 12.2); scene.add(tag); notBp.push(tag);
   const pad = new THREE.Mesh(new THREE.RingGeometry(4.2, 5.4, 40), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
   pad.rotation.x = -Math.PI / 2; pad.position.set(c.x, 0.08, c.z + HALF + 9); scene.add(pad);
   buildings.push({ p, i, holder, sprite, pad, center: c, padPos: pad.position.clone(), h: info.top, banner });
-  colliders.push({ x: c.x, z: c.z, rx: HALF + 2.2, rz: HALF + 2.6, h: Math.max(info.top, BANNER_TOP) + 1 });
+  colliders.push({ x: c.x, z: c.z, rx: HALF + 2.2, rz: HALF + 2.2, h: info.top + 1 }); bannerColliders(c);
 });
 
 const plazaC = lotCenter(PLAZA_LOT[0], PLAZA_LOT[1]);
@@ -669,19 +797,18 @@ SPECIALS.forEach((sp, k) => {
   const label = [sp.name, sp.sub, sp.color];
   const tex = { day: labelTexture(...label, "day"), night: labelTexture(...label, "night") };
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex.day, transparent: true, depthWrite: false }));
-  sprite.scale.set(16, 4, 1); sprite.position.set(c.x, top + 6, c.z); sprite.userData = { label, tex }; scene.add(sprite);
+  sprite.scale.set(16, 4, 1); sprite.position.set(c.x, Math.max(top, BANNER_TOP) + 5, c.z); sprite.userData = { label, tex }; scene.add(sprite);
   const pad = new THREE.Mesh(new THREE.RingGeometry(4.2, 5.4, 40), new THREE.MeshBasicMaterial({ color: sp.color, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
   pad.rotation.x = -Math.PI / 2; pad.position.set(c.x, 0.08, c.z + HALF + 9); scene.add(pad);
   /* info banner in front of the special building, same frame as the project banners */
   const ig = new THREE.Group(); ig.position.set(0, 0, BZ); holder.add(ig);
-  part(ig, new THREE.BoxGeometry(BW + 0.8, BH + 0.8, 0.6), 0, BY + BH / 2, 0, frameMats, idx);
-  part(ig, legGeo, -BW * 0.32, BY / 2, 0, frameMats); part(ig, legGeo, BW * 0.32, BY / 2, 0, frameMats);
+  bannerFrame(ig, idx);
   const infoMat = new THREE.MeshBasicMaterial({ map: infoTexture(sp.kind) });
-  const iscr = new THREE.Mesh(new THREE.PlaneGeometry(BW, BH), infoMat); iscr.position.set(0, BY + BH / 2, 0.31); ig.add(iscr);
-  const iplate = new THREE.Mesh(new THREE.PlaneGeometry(BW + 0.8, PLATE_H), new THREE.MeshBasicMaterial({ map: nameplateTexture({ name: sp.name, engineLabel: sp.sub }, sp.color) })); iplate.position.set(0, BY + BH + 0.4 + PLATE_H / 2, 0.05); ig.add(iplate);
+  bannerScreen(ig, infoMat, idx);
+  const iplate = bannerPlate(ig, new THREE.MeshBasicMaterial({ map: nameplateTexture({ name: sp.name, engineLabel: sp.sub }, sp.color) }));
   fontsReady.then(() => { infoMat.map = infoTexture(sp.kind); infoMat.needsUpdate = true; iplate.material.map = nameplateTexture({ name: sp.name, engineLabel: sp.sub }, sp.color); iplate.material.needsUpdate = true; });
   buildings.push({ p: null, special: sp.kind, color: sp.color, i: idx, holder, sprite, pad, center: c, padPos: pad.position.clone(), h: top, banner: { video: null } });
-  colliders.push({ x: c.x, z: c.z, rx: HALF + 2.2, rz: HALF + 2.6, h: Math.max(top, BANNER_TOP) + 1 });
+  colliders.push({ x: c.x, z: c.z, rx: HALF + 2.2, rz: HALF + 2.2, h: top + 1 }); bannerColliders(c);
 });
 function relabel() {
   const m = look === "day" ? "day" : "night";
@@ -1037,14 +1164,14 @@ const figures = [];
 PROJECTS.forEach((p, i) => {
   const ch = CHARACTERS[p.id] || { type: "mystery", label: p.name, hi: p.name };
   const b = buildings[i], col = COLORS[p.engine], css = CSSCOL[p.engine];
-  const spot = new THREE.Group(); spot.position.set(b.center.x - 12.2, 0.3, b.center.z + 11.5); scene.add(spot); notBp.push(spot);
+  const spot = new THREE.Group(); spot.position.set(b.center.x - 8, 0.3, b.center.z + 15.8); scene.add(spot); notBp.push(spot);
   /* hero stage: a low disc with a glowing ring in the engine colour, and a light cone at night */
   const stage = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.6, 0.5, 28), M(0x1E2533)); stage.position.y = 0.25; stage.receiveShadow = true; spot.add(stage);
   const glowRing = new THREE.Mesh(new THREE.TorusGeometry(2.45, 0.12, 8, 40), new THREE.MeshBasicMaterial({ color: col })); glowRing.rotation.x = Math.PI / 2; glowRing.position.y = 0.52; spot.add(glowRing);
   const cone = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 2.6, 14, 24, 1, true), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false })); cone.position.y = 7.3; spot.add(cone); nightOnly.push(cone);
   const H = makeHero(ch.type, col); H.g.position.y = 0.5; H.g.scale.setScalar(2.0); H.g.rotation.y = 0.5; spot.add(H.g);
   const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: charLabel(ch.label, p.name, css), depthWrite: false })); tag.scale.set(6.8, 1.6, 1); tag.position.set(0, 7.4, 0); spot.add(tag);
-  const bub = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTex(ch.hi), depthWrite: false, transparent: true })); bub.scale.set(6.6, 1.55, 1); bub.position.set(-3.6, 9.6, 0); bub.visible = false; spot.add(bub);
+  const bub = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTex(ch.hi), depthWrite: false, transparent: true })); bub.scale.set(6.6, 1.55, 1); bub.position.set(0, 8.3, 0); bub.visible = false; spot.add(bub);
   bub.scale.set(6.6, 6.6 * 230 / 720, 1);
   const fig = Object.assign(H, { i, spot, tag, bub, label: ch.label, hi: ch.hi, lines: talkLines(p, ch.hi), talkK: -1, talkT: 0, css, phase: i * 0.9, glb: null });
   figures.push(fig);
@@ -1073,7 +1200,7 @@ function stepPeople(dt, now) {
     const wx = f.spot.position.x, wz = f.spot.position.z, dx = state.x - wx, dz = state.z - wz;
     const close = Math.hypot(dx, dz) < 34 && view === "drive";
     const want = close ? Math.atan2(dx, dz) : 0.5; f.g.rotation.y += angDiff(want, f.g.rotation.y) * Math.min(1, dt * 4);
-    f.bub.visible = here && view !== "simple";
+    f.bub.visible = here && view !== "simple"; f.tag.visible = !f.bub.visible;   /* the bubble takes the name tag's place while talking */
     /* while parked, the character talks through its lines, one every few seconds */
     if (here && (f.talkK < 0 || now - f.talkT > 4500)) {
       f.talkK = f.talkK < 0 ? 0 : (f.talkK + 1) % f.lines.length; f.talkT = now;
@@ -1230,7 +1357,9 @@ const map = { KeyW: "up", ArrowUp: "up", KeyS: "down", ArrowDown: "down", KeyA: 
 /* hover flight: hold F (Space, Numpad +, Page Up) to climb, hold E (C, Numpad -, Page Down) to descend.
    E is shared with "open the building": on the ground beside a ring a fresh press opens it, anywhere else it descends. */
 const fly = { on: false, alt: 0, target: 0, vy: 0 };
-function overRoof(x, z) { return colliders.some((c) => Math.abs(x - c.x) < c.rx && Math.abs(z - c.z) < c.rz); }
+const JET_TOP = 2.4;   /* height of the jet's top above its altitude */
+const beneath = (c) => c.y0 !== undefined && fly.alt + JET_TOP < c.y0;
+function overRoof(x, z) { return colliders.some((c) => !beneath(c) && Math.abs(x - c.x) < c.rx && Math.abs(z - c.z) < c.rz); }
 function liftOff() { fly.on = true; document.body.classList.add("flying"); closeCard(); leaveArrival(); }
 function land() {
   if (overRoof(state.x, state.z)) toast("Find a street to land on.", "You are above a building. Fly over a road or a ring, then hold E to come down.", [["OK", () => {}]]);
@@ -1296,8 +1425,30 @@ function pick(cx, cy) {
   ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
   ray.setFromCamera(ndc, camera);
   const hit = ray.intersectObjects(pickables, false)[0];
-  if (hit) { const i = hit.object.userData.i; openStop(i); focus(i); }
+  if (hit) { const i = hit.object.userData.i; if (bannerPicks.includes(hit.object)) openTheater(i); else openStop(i); focus(i); }
 }
+/* drive: tap or click a banner to watch it; the cursor shows what can be clicked */
+function pickAt(list, cx, cy) {
+  const r = canvas.getBoundingClientRect();
+  ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(list, false)[0];
+  return hit ? hit.object.userData.i : -1;
+}
+let tap = null, hoverT = 0;
+canvas.addEventListener("pointerdown", (e) => { if (view === "drive") tap = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+canvas.addEventListener("pointerup", (e) => {
+  if (view !== "drive" || !tap) return;
+  const still = Math.abs(e.clientX - tap.x) + Math.abs(e.clientY - tap.y) < 8 && performance.now() - tap.t < 500; tap = null;
+  if (!still) return;
+  const i = pickAt(bannerPicks, e.clientX, e.clientY);
+  if (i >= 0) { if (touring) endTour(); cancelAuto(); openTheater(i); }
+});
+canvas.addEventListener("pointermove", (e) => {
+  if (e.pointerType !== "mouse" || view === "simple" || e.buttons) return;
+  const now = performance.now(); if (now - hoverT < 90) return; hoverT = now;
+  canvas.classList.toggle("can-click", pickAt(view === "drive" ? bannerPicks : pickables, e.clientX, e.clientY) >= 0);
+});
 function focus(i) { const b = buildings[i]; orbit.goal.set(b.center.x, b.h * 0.5, b.center.z); orbit.goalR = 80; orbit.last = performance.now(); }
 
 /* hooks for the shared UI */
@@ -1459,7 +1610,7 @@ setTimeout(() => $("loader").classList.add("gone"), reduceMotion ? 0 : 700);
 
 /* loop */
 let last = performance.now(), t = 0;
-const camPos = new THREE.Vector3(), look3 = new THREE.Vector3(), bannerAim = new THREE.Vector3(); let frame = 0;
+const camPos = new THREE.Vector3(), look3 = new THREE.Vector3(), bannerAim = new THREE.Vector3(), fitPos = new THREE.Vector3(); let frame = 0;
 function insideBuilding(x, y, z) { return buildings.some((b) => Math.abs(x - b.center.x) < HALF + 2 && Math.abs(z - b.center.z) < HALF + 2.5 && y < b.h + 2); }
 function step(now) {
   requestAnimationFrame(step);
@@ -1491,14 +1642,14 @@ function step(now) {
   state.h += turn * dt * (1.6 + Math.min(Math.abs(state.v), 30) * 0.03) * (state.v < -0.5 ? -1 : 1);
   let nx = state.x + Math.sin(state.h) * state.v * dt, nz = state.z + Math.cos(state.h) * state.v * dt;
   if (!auto) for (const c of colliders) {
-    if (fly.alt > c.h) continue;   /* flying above it */
+    if (fly.alt > c.h || beneath(c)) continue;   /* flying above it, or passing under a raised banner */
     if (Math.abs(nx - c.x) < c.rx && Math.abs(nz - c.z) < c.rz) {
       if (Math.abs(state.x - c.x) >= c.rx) nx = state.x; else if (Math.abs(state.z - c.z) >= c.rz) nz = state.z; else { nx = state.x; nz = state.z; }
       state.v *= -0.25;
     }
   }
   /* descending onto a roof is blocked: hold height above it */
-  if (fly.on || fly.alt > 0) for (const c of colliders) { if (Math.abs(state.x - c.x) < c.rx && Math.abs(state.z - c.z) < c.rz && fly.alt < c.h + 0.5 && fly.target < c.h + 2) { fly.target = Math.max(fly.target, c.h + 3); if (!fly.on) fly.on = true; } }
+  if (fly.on || fly.alt > 0) for (const c of colliders) { if (beneath(c)) continue; if (Math.abs(state.x - c.x) < c.rx && Math.abs(state.z - c.z) < c.rz && fly.alt < c.h + 0.5 && fly.target < c.h + 2) { fly.target = Math.max(fly.target, c.h + 3); if (!fly.on) fly.on = true; } }
   if (!auto) { state.x = Math.max(-EX + 4, Math.min(EX - 4, nx)); state.z = Math.max(-EZ + 4, Math.min(EZ - 4, nz)); }
   const alt = autoAlt + fly.alt;
   car.position.set(state.x, 1.2 + alt + (reduceMotion ? 0 : Math.sin(t * 3) * 0.12), state.z);
@@ -1516,15 +1667,23 @@ function step(now) {
     const fx = Math.sin(state.h), fz = Math.cos(state.h);
     const focusIdx = arrivedIdx >= 0 ? arrivedIdx : (auto ? -1 : near);
     frame += ((focusIdx >= 0 && Math.abs(state.v) < 12 ? 1 : 0) - frame) * (1 - Math.pow(0.08, dt));
-    const dist = 19 + Math.max(state.v, 0) * 0.1 - frame * 3, height = 11 + frame * 4;
+    const dist = 19 + Math.max(state.v, 0) * 0.1, height = 11;
     camPos.set(state.x - fx * dist, height + alt * 0.95, state.z - fz * dist);
     /* keep the camera out of buildings: pull it toward the car (and lift it) if the path is blocked */
     const ddx = camPos.x - state.x, ddz = camPos.z - state.z; let clear = 1;
     for (let k = 1; k <= 14; k++) { const f = k / 14; if (insideBuilding(state.x + ddx * f, camPos.y, state.z + ddz * f)) { clear = (k - 1) / 14; break; } }
     clear = Math.max(clear, 0.3); camPos.set(state.x + ddx * clear, camPos.y + (1 - clear) * 7, state.z + ddz * clear);
+    /* parked: frame the whole banner and its nameplate, square on, at the distance where it just fits the screen
+       (the building across the street may contain the camera; its walls face away, so it does not block the view) */
+    if (frame > 0.01 && focusIdx >= 0) {
+      const b = buildings[focusIdx], tv = Math.tan(camera.fov * Math.PI / 360), th = tv * camera.aspect;
+      const d = Math.max(BANNER_HALF_H / tv, (BW / 2 + 0.8) / th) * 1.24;
+      bannerAim.set(b.center.x, BANNER_MID + 1.4, b.center.z + BZ);   /* aim a little high so the header never covers the nameplate */
+      fitPos.set(b.center.x, BANNER_MID + 1.5, b.center.z + BZ + d); camPos.lerp(fitPos, frame);
+    }
     if (camSnap) { camera.position.copy(camPos); camSnap = false; } else camera.position.lerp(camPos, 1 - Math.pow(auto ? 0.0002 : 0.002, rawDt));
     look3.set(state.x + fx * 12, 5 + alt * 0.85, state.z + fz * 12);
-    if (frame > 0.01 && focusIdx >= 0) { const b = buildings[focusIdx]; bannerAim.set(b.center.x, BY + BH * 0.62, b.center.z + BZ); look3.lerp(bannerAim, frame); }
+    if (frame > 0.01 && focusIdx >= 0) look3.lerp(bannerAim, frame);
     camera.lookAt(look3);
   } else {
     if (!reduceMotion && now - orbit.last > 4000) orbit.theta += dt * 0.07;
