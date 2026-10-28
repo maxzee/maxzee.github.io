@@ -419,12 +419,14 @@ for (let k = 0; k <= NZ; k++) { const r = (k - NZ / 2) * PITCH;
 for (let k = 0; k <= NX; k++) { const r = (k - NX / 2) * PITCH;
   const b = dual(new THREE.Mesh(new THREE.PlaneGeometry(EZ * 2, 0.5), dashMats.day), dashMats.day, dashMats.night); b.rotation.x = -Math.PI / 2; b.rotation.z = Math.PI / 2; b.position.set(r, 0.041, 0); world.add(b); notBp.push(b); }
 /* plots: sidewalk slab + green plot outline (KingdomLand-style land grid) */
-const lawnMats = { day: new THREE.MeshStandardMaterial({ color: 0x8CC56B, roughness: 1 }), night: new THREE.MeshStandardMaterial({ color: 0x14261A, roughness: 1 }) };
+/* the lawn sits 0.03 above the slab and is pulled toward the camera in depth, so it never shimmers against the slab from far away */
+const lawnOffset = { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 };
+const lawnMats = { day: new THREE.MeshStandardMaterial({ color: 0x8CC56B, roughness: 1, ...lawnOffset }), night: new THREE.MeshStandardMaterial({ color: 0x14261A, roughness: 1, ...lawnOffset }) };
 const plotLineMat = new THREE.LineBasicMaterial({ color: 0x2FBF63 });
 for (let i = 0; i < NX; i++) for (let j = 0; j < NZ; j++) {
   const c = lotCenter(i, j);
   const w = dual(new THREE.Mesh(new THREE.BoxGeometry(LOT, 0.3, LOT), walkMats.day), walkMats.day, walkMats.night); w.position.set(c.x, 0.15, c.z); w.receiveShadow = true; world.add(w); notBp.push(w);
-  const lawn = dual(new THREE.Mesh(new THREE.PlaneGeometry(LOT - 6, LOT - 6), lawnMats.day), lawnMats.day, lawnMats.night); lawn.rotation.x = -Math.PI / 2; lawn.position.set(c.x, 0.31, c.z); lawn.receiveShadow = true; world.add(lawn); notBp.push(lawn);
+  const lawn = dual(new THREE.Mesh(new THREE.PlaneGeometry(LOT - 6, LOT - 6), lawnMats.day), lawnMats.day, lawnMats.night); lawn.rotation.x = -Math.PI / 2; lawn.position.set(c.x, 0.33, c.z); lawn.receiveShadow = true; world.add(lawn); notBp.push(lawn);
   const o = LOT / 2 - 0.4, pts = [[-o, -o], [o, -o], [o, o], [-o, o]].map(([dx, dz]) => new THREE.Vector3(c.x + dx, 0.34, c.z + dz));
   const loop = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), plotLineMat); world.add(loop); dayOnly.push(loop);
 }
@@ -631,7 +633,7 @@ function buildArchetype(holder, p, i, col) {
 }
 
 /* ---------- demo-video banners ---------- */
-/* Banners carry the content; buildings are scenery. Each screen is as wide as the block allows (neighbours sit 46 apart),
+/* Banners carry the content; buildings are scenery. Each screen is as wide as the block allows (neighbours sit 58 apart),
    raised on pylons so the jet, traffic and the character pass underneath, and double-sided so it reads from both streets. */
 const BW = 36, BH = 20.25, BY = 9, BZ = HALF + 3.5;
 const PLATE_H = 3.8, BANNER_TOP = BY + BH + 0.4 + PLATE_H, LEG_X = BW * 0.36;
@@ -735,7 +737,7 @@ PROJECTS.forEach((p, i) => {
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex.day, transparent: true, depthWrite: false }));
   sprite.scale.set(16, 4, 1); sprite.position.set(c.x, Math.max(info.top, BANNER_TOP) + 5, c.z); sprite.userData = { label, tex }; scene.add(sprite);
   const tag = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), new THREE.MeshBasicMaterial({ map: plotTag(i + 1, CSSCOL[p.engine]), transparent: true }));
-  tag.rotation.x = -Math.PI / 2; tag.position.set(c.x - 8, 0.36, c.z + 12.2); scene.add(tag); notBp.push(tag);
+  tag.rotation.x = -Math.PI / 2; tag.position.set(c.x - 8, 0.38, c.z + 12.2); scene.add(tag); notBp.push(tag);
   const pad = new THREE.Mesh(new THREE.RingGeometry(4.2, 5.4, 40), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
   pad.rotation.x = -Math.PI / 2; pad.position.set(c.x, 0.08, c.z + PAD_Z); scene.add(pad);
   buildings.push({ p, i, holder, sprite, pad, center: c, padPos: pad.position.clone(), h: info.top, banner, yaw });
@@ -771,7 +773,7 @@ function paintTexture() {
   return new THREE.CanvasTexture(c);
 }
 const paint = new THREE.Mesh(new THREE.PlaneGeometry(20, 4.3), new THREE.MeshBasicMaterial({ map: paintTexture(), transparent: true }));
-paint.rotation.x = -Math.PI / 2; paint.position.set(plazaC.x, 0.34, plazaC.z + 8); scene.add(paint); notBp.push(paint);
+paint.rotation.x = -Math.PI / 2; paint.position.set(plazaC.x, 0.38, plazaC.z + 8); scene.add(paint); notBp.push(paint);
 /* district signs on the main avenue */
 function signTexture(t) {
   const c = document.createElement("canvas"); c.width = 640; c.height = 140; const x = c.getContext("2d");
@@ -1606,7 +1608,8 @@ function stepAuto(dt) {
   const k = Math.min(1, auto.u / 0.15, (1 - auto.u) / 0.15); autoAlt = 2.4 * ease(Math.max(0, k)) + auto.startAlt * (1 - Math.min(1, auto.u / 0.35));
   if (auto.u >= 1) { const a = auto; auto = null; autoAlt = 0; autoBank = 0; state.h = Math.PI + buildings[a.i].yaw; document.body.classList.remove("autodrive"); arrive(a.i); if (a.after) a.after(); }
 }
-function cancelAuto() { if (auto) { auto = null; autoAlt = 0; autoBank = 0; document.body.classList.remove("autodrive"); } }
+/* stopping mid-drive keeps the current hover height: it moves into fly.alt and eases down from there, so the jet never drops */
+function cancelAuto() { if (auto) { auto = null; fly.alt += autoAlt; autoAlt = 0; autoBank = 0; document.body.classList.remove("autodrive"); } }
 hooks.driveTo = driveTo;
 
 /* ---------- guided tour: drives the streets stop to stop ---------- */
@@ -1692,12 +1695,12 @@ function occludersOf(i, cam) {
     return false;
   });
 }
-let hiddenAcross = [];
+let hiddenOccluders = [];
 /* hide exactly the buildings in `list` (and restore any previously hidden ones no longer listed) */
 function setHidden(list) {
-  hiddenAcross.forEach((o) => { if (!list.includes(o)) { o.holder.visible = true; o.sprite.visible = true; } });
+  hiddenOccluders.forEach((o) => { if (!list.includes(o)) { o.holder.visible = true; o.sprite.visible = true; } });
   list.forEach((o) => { o.holder.visible = false; o.sprite.visible = false; });
-  hiddenAcross = list;
+  hiddenOccluders = list;
 }
 function insideBuilding(x, y, z) { return buildings.some((b) => Math.abs(x - b.center.x) < HALF + 2 && Math.abs(z - b.center.z) < HALF + 2.5 && y < b.h + 2); }
 function step(now) {
@@ -1708,7 +1711,7 @@ function step(now) {
     buildings.forEach((b, k) => { const lp = Math.min(Math.max(intro * 1.6 - k * 0.04, 0), 1); b.holder.scale.y = Math.max(0.001, 1 - Math.pow(1 - lp, 3)); });
     if (intro >= 1) finishIntro();
   }
-  if (view === "simple") { if (hiddenAcross.length) setHidden([]); renderHero(dt); return; }   /* only the hero city draws in the 2D view */
+  if (view === "simple") { if (hiddenOccluders.length) setHidden([]); renderHero(dt); return; }   /* only the hero city draws in the 2D view */
 
   /* guided tour: hover-fly between stops, park, show the case study */
   if (auto) stepAuto(rawDt);
@@ -1756,7 +1759,7 @@ function step(now) {
     for (let k = 1; k <= 14; k++) { const f = k / 14; if (insideBuilding(state.x + ddx * f, camPos.y, state.z + ddz * f)) { clear = (k - 1) / 14; break; } }
     clear = Math.max(clear, 0.3); camPos.set(state.x + ddx * clear, camPos.y + (1 - clear) * 7, state.z + ddz * clear);
     /* parked: frame the whole banner and its nameplate, square on, at the distance where it just fits the screen
-       (the building across the street may contain the camera; its walls face away, so it does not block the view) */
+       (any building between the camera and the banner is hidden while framed: see occludersOf) */
     const fitW = arrivedIdx >= 0 ? frame : 0;   /* only an actual arrival frames the banner; merely passing a pad keeps the chase camera */
     if (fitW > 0.01) {
       const b = buildings[arrivedIdx], tv = Math.tan(camera.fov * Math.PI / 360), th = tv * camera.aspect;
@@ -1770,7 +1773,7 @@ function step(now) {
     if (fitW > 0.01) look3.lerp(bannerAim, fitW);
     camera.lookAt(look3);
   } else {
-    if (hiddenAcross.length) setHidden([]);
+    if (hiddenOccluders.length) setHidden([]);
     if (!reduceMotion && now - orbit.last > 4000) orbit.theta += dt * 0.07;
     orbit.target.lerp(orbit.goal, 1 - Math.pow(0.02, dt));
     orbit.r += (orbit.goalR - orbit.r) * (1 - Math.pow(0.02, dt));
