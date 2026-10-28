@@ -1659,7 +1659,7 @@ function step(now) {
     buildings.forEach((b, k) => { const lp = Math.min(Math.max(intro * 1.6 - k * 0.04, 0), 1); b.holder.scale.y = Math.max(0.001, 1 - Math.pow(1 - lp, 3)); });
     if (intro >= 1) finishIntro();
   }
-  if (view === "simple") { renderHero(dt); return; }   /* only the hero city draws in the 2D view */
+  if (view === "simple") { if (hiddenAcross.length) setHidden([]); renderHero(dt); return; }   /* only the hero city draws in the 2D view */
 
   /* guided tour: hover-fly between stops, park, show the case study */
   if (auto) stepAuto(rawDt);
