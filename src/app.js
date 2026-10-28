@@ -361,13 +361,14 @@ renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadow
 
 const hemi = new THREE.HemisphereLight(0x6680bb, 0x0a0c14, 0.55); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0x9aaee0, 0.55); sun.position.set(90, 160, 60); scene.add(sun); scene.add(sun.target);
-sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera; sc.left = -150; sc.right = 150; sc.top = 150; sc.bottom = -150; sc.near = 10; sc.far = 420; sun.shadow.bias = -0.0008;
+sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera; sc.near = 10; sc.far = 420 * 1.25; sun.shadow.bias = -0.0008;
 const amb = new THREE.AmbientLight(0x223047, 0.5); scene.add(amb);
 
 /* one extra street row (Unreal and personal) holds the six projects added after the prototype */
-const PITCH = 46, NX = 5, NZ = 5, HALF = 11;
+const PITCH = 58, NX = 5, NZ = 5, HALF = 11, LOT = PITCH - 18, PAD_Z = LOT / 2 + 6;   /* roads stay 18 wide; LOT = the slab each building stands on */
 const lotCenter = (i, j) => new THREE.Vector3((i - (NX - 1) / 2) * PITCH, 0, (j - (NZ - 1) / 2) * PITCH);
-const EX = NX / 2 * PITCH + 18, EZ = NZ / 2 * PITCH + 18, EXTENT = Math.max(EX, EZ);
+const EX = NX / 2 * PITCH + 18, EZ = NZ / 2 * PITCH + 18, EXTENT = Math.max(EX, EZ), SCALE = EXTENT / 133;   /* 133 = the old city's extent, for scaling world-wide numbers */
+sc.left = -(EXTENT + 20); sc.right = EXTENT + 20; sc.top = EXTENT + 20; sc.bottom = -(EXTENT + 20); sc.updateProjectionMatrix();
 /* districts = portfolio sections, one per row */
 const LAYOUT = { kingdomland: [0, 0], nayzak: [1, 0], wahm: [2, 0], "kick-arena": [3, 0], tamr: [4, 0],
   "mars-simulation": [0, 1], orionmeta: [1, 1], "island-of-deceit": [2, 1],
@@ -418,11 +419,13 @@ for (let k = 0; k <= NZ; k++) { const r = (k - NZ / 2) * PITCH;
 for (let k = 0; k <= NX; k++) { const r = (k - NX / 2) * PITCH;
   const b = dual(new THREE.Mesh(new THREE.PlaneGeometry(EZ * 2, 0.5), dashMats.day), dashMats.day, dashMats.night); b.rotation.x = -Math.PI / 2; b.rotation.z = Math.PI / 2; b.position.set(r, 0.041, 0); world.add(b); notBp.push(b); }
 /* plots: sidewalk slab + green plot outline (KingdomLand-style land grid) */
+const lawnMats = { day: new THREE.MeshStandardMaterial({ color: 0x8CC56B, roughness: 1 }), night: new THREE.MeshStandardMaterial({ color: 0x14261A, roughness: 1 }) };
 const plotLineMat = new THREE.LineBasicMaterial({ color: 0x2FBF63 });
 for (let i = 0; i < NX; i++) for (let j = 0; j < NZ; j++) {
   const c = lotCenter(i, j);
-  const w = dual(new THREE.Mesh(new THREE.BoxGeometry(28, 0.3, 28), walkMats.day), walkMats.day, walkMats.night); w.position.set(c.x, 0.15, c.z); w.receiveShadow = true; world.add(w); notBp.push(w);
-  const pts = [[-13.6, -13.6], [13.6, -13.6], [13.6, 13.6], [-13.6, 13.6]].map(([dx, dz]) => new THREE.Vector3(c.x + dx, 0.34, c.z + dz));
+  const w = dual(new THREE.Mesh(new THREE.BoxGeometry(LOT, 0.3, LOT), walkMats.day), walkMats.day, walkMats.night); w.position.set(c.x, 0.15, c.z); w.receiveShadow = true; world.add(w); notBp.push(w);
+  const lawn = dual(new THREE.Mesh(new THREE.PlaneGeometry(LOT - 6, LOT - 6), lawnMats.day), lawnMats.day, lawnMats.night); lawn.rotation.x = -Math.PI / 2; lawn.position.set(c.x, 0.31, c.z); lawn.receiveShadow = true; world.add(lawn); notBp.push(lawn);
+  const o = LOT / 2 - 0.4, pts = [[-o, -o], [o, -o], [o, o], [-o, o]].map(([dx, dz]) => new THREE.Vector3(c.x + dx, 0.34, c.z + dz));
   const loop = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), plotLineMat); world.add(loop); dayOnly.push(loop);
 }
 
@@ -704,7 +707,7 @@ PROJECTS.forEach((p, i) => {
   const tag = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), new THREE.MeshBasicMaterial({ map: plotTag(i + 1, CSSCOL[p.engine]), transparent: true }));
   tag.rotation.x = -Math.PI / 2; tag.position.set(c.x - 8, 0.36, c.z + 12.2); scene.add(tag); notBp.push(tag);
   const pad = new THREE.Mesh(new THREE.RingGeometry(4.2, 5.4, 40), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
-  pad.rotation.x = -Math.PI / 2; pad.position.set(c.x, 0.08, c.z + HALF + 9); scene.add(pad);
+  pad.rotation.x = -Math.PI / 2; pad.position.set(c.x, 0.08, c.z + PAD_Z); scene.add(pad);
   buildings.push({ p, i, holder, sprite, pad, center: c, padPos: pad.position.clone(), h: info.top, banner });
   colliders.push({ x: c.x, z: c.z, rx: HALF + 2.2, rz: HALF + 2.2, h: info.top + 1 }); bannerColliders(c);
 });
@@ -803,7 +806,7 @@ SPECIALS.forEach((sp, k) => {
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex.day, transparent: true, depthWrite: false }));
   sprite.scale.set(16, 4, 1); sprite.position.set(c.x, Math.max(top, BANNER_TOP) + 5, c.z); sprite.userData = { label, tex }; scene.add(sprite);
   const pad = new THREE.Mesh(new THREE.RingGeometry(4.2, 5.4, 40), new THREE.MeshBasicMaterial({ color: sp.color, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
-  pad.rotation.x = -Math.PI / 2; pad.position.set(c.x, 0.08, c.z + HALF + 9); scene.add(pad);
+  pad.rotation.x = -Math.PI / 2; pad.position.set(c.x, 0.08, c.z + PAD_Z); scene.add(pad);
   /* info banner in front of the special building, same frame as the project banners */
   const ig = new THREE.Group(); ig.position.set(0, 0, BZ); holder.add(ig);
   bannerFrame(ig, idx);
@@ -1241,7 +1244,7 @@ function stepPeople(dt, now) {
     }
   });
   walkers.forEach((w) => {
-    w.t += w.sp * dt * (still ? 0.5 : 1); const [x, z, r] = rectPos(w.t, 13.4);
+    w.t += w.sp * dt * (still ? 0.5 : 1); const [x, z, r] = rectPos(w.t, LOT / 2 - 0.6);
     w.g.position.set(w.c.x + x, 0.3, w.c.z + z); w.g.rotation.y = w.sp > 0 ? r : r + Math.PI;
     if (w.legs && !still) { const a = Math.sin(now / 160 + w.t * 50) * 0.55; w.legs[0].rotation.x = a; w.legs[1].rotation.x = -a; }
   });
@@ -1264,9 +1267,9 @@ function addPalm(x, z) {
 for (let i = 0; i < NX; i++) for (let j = 0; j < NZ; j++) {
   const c = lotCenter(i, j);
   if (PARK_LOTS.some(([a, b]) => a === i && b === j)) { [[-7, -7], [0, -8], [7, -6], [-6, 2], [6, 3], [-2, 8], [8, 9]].forEach(([dx, dz]) => addPalm(c.x + dx, c.z + dz)); continue; }
-  [[-12.5, -12.5], [12.5, -12.5]].forEach(([dx, dz]) => addPalm(c.x + dx, c.z + dz));   /* front corners stay clear so banners are never blocked */
+  [[-(LOT / 2 - 1.5), -(LOT / 2 - 1.5)], [LOT / 2 - 1.5, -(LOT / 2 - 1.5)]].forEach(([dx, dz]) => addPalm(c.x + dx, c.z + dz));   /* front corners stay clear so banners are never blocked */
 }
-for (let k = -6; k <= 6; k++) { addPalm(k * 21, -LZ + 8); addPalm(k * 21, LZ - 8); } for (let k = -6; k <= 6; k++) { addPalm(-LX + 8, k * 19); addPalm(LX - 8, k * 19); }
+for (let x = -LX + 8; x <= LX - 8; x += 21) { addPalm(x, -LZ + 8); addPalm(x, LZ - 8); } for (let z = -LZ + 8; z <= LZ - 8; z += 19) { addPalm(-LX + 8, z); addPalm(LX - 8, z); }
 
 /* clouds (day) */
 const clouds = new THREE.Group(); scene.add(clouds); dayOnly.push(clouds);
@@ -1274,7 +1277,7 @@ const cloudMat = new THREE.MeshLambertMaterial({ color: 0xFFFFFF, emissive: 0x88
 for (let k = 0; k < 14; k++) {
   const g = new THREE.Group(); const n = 3 + (k % 3);
   for (let q = 0; q < n; q++) { const s = new THREE.Mesh(new THREE.SphereGeometry(6 + (q % 2) * 3, 10, 8), cloudMat); s.position.set(q * 7 - n * 3, (q % 2) * 2, (q % 3) * 3); s.scale.y = 0.55; g.add(s); }
-  const a = k / 14 * Math.PI * 2, r = 120 + (k % 4) * 60; g.position.set(Math.cos(a) * r, 95 + (k % 5) * 12, Math.sin(a) * r); clouds.add(g);
+  const a = k / 14 * Math.PI * 2, r = (120 + (k % 4) * 60) * SCALE; g.position.set(Math.cos(a) * r, 95 + (k % 5) * 12, Math.sin(a) * r); clouds.add(g);
 }
 
 /* hover jet (VTOL): nose points along +z, banks on body.rotation.z, pitches on body.rotation.x */
@@ -1412,7 +1415,7 @@ document.querySelectorAll("#touch button").forEach((b) => {
 $("prompt").addEventListener("click", () => { if ($("prompt").dataset.mode === "land") land(); else if (near >= 0) openStop(near); });
 
 /* spectate orbit */
-const orbit = { theta: 0.7, phi: 0.95, r: 190, target: new THREE.Vector3(0, 6, 0), goal: new THREE.Vector3(0, 6, 0), goalR: 190, last: 0 };
+const orbit = { theta: 0.7, phi: 0.95, r: 190 * SCALE, target: new THREE.Vector3(0, 6, 0), goal: new THREE.Vector3(0, 6, 0), goalR: 190 * SCALE, last: 0 };
 if (window.__ui) window.__city = { state, fly, orbit, camera, buildings, colliders, insideCollider, setFrameCap: (s) => { frameCap = s; } };
 const ptrs = new Map(); let down = null, pinch0 = 0, r0 = 0;
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
@@ -1432,7 +1435,7 @@ canvas.addEventListener("pointermove", (e) => {
     if (down) down.moved += Math.abs(dx) + Math.abs(dy);
   } else if (ptrs.size === 2) {
     const [a, b] = [...ptrs.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y);
-    if (pinch0 > 0) orbit.goalR = Math.max(45, Math.min(280, r0 * pinch0 / d));
+    if (pinch0 > 0) orbit.goalR = Math.max(45 * SCALE, Math.min(280 * SCALE, r0 * pinch0 / d));
     if (down) down.moved = 99;
   }
   orbit.last = performance.now();
@@ -1444,7 +1447,7 @@ function endPtr(e) {
   if (ptrs.size === 0) down = null;
 }
 canvas.addEventListener("pointerup", endPtr); canvas.addEventListener("pointercancel", endPtr);
-canvas.addEventListener("wheel", (e) => { if (view !== "spectate") return; e.preventDefault(); orbit.goalR = Math.max(45, Math.min(280, orbit.goalR * (1 + e.deltaY * 0.001))); orbit.last = performance.now(); }, { passive: false });
+canvas.addEventListener("wheel", (e) => { if (view !== "spectate") return; e.preventDefault(); orbit.goalR = Math.max(45 * SCALE, Math.min(280 * SCALE, orbit.goalR * (1 + e.deltaY * 0.001))); orbit.last = performance.now(); }, { passive: false });
 function pick(cx, cy) {
   const r = canvas.getBoundingClientRect();
   ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
@@ -1491,7 +1494,7 @@ function travel(i, open) {
 hooks.travel = travel; hooks.focus = focus;
 hooks.onView = (v) => {
   Object.keys(keys).forEach((k) => keys[k] = false);
-  if (v === "spectate") { orbit.goal.set(state.x * 0.3, 6, state.z * 0.3); orbit.goalR = 190; orbit.last = 0; }
+  if (v === "spectate") { orbit.goal.set(state.x * 0.3, 6, state.z * 0.3); orbit.goalR = 190 * SCALE; orbit.last = 0; }
   if (v === "drive") camSnap = true;
 };
 hooks.onLook = (l) => {
@@ -1610,7 +1613,7 @@ function renderHero(dt) {
   const w = hc.clientWidth, h = hc.clientHeight; if (!w || !h) return;
   if (hc.width !== Math.floor(w * r2.getPixelRatio()) || hc.height !== Math.floor(h * r2.getPixelRatio())) { r2.setSize(w, h, false); cam2.aspect = w / h; fitFov(cam2, w / h, 38); cam2.updateProjectionMatrix(); }
   if (!reduceMotion && heroHover < 0 && !heroDrag && performance.now() - heroLast > 1500) heroTheta += dt * 0.12;
-  cam2.position.set(Math.sin(heroTheta) * 240, 165, Math.cos(heroTheta) * 240); cam2.lookAt(0, 8, 0);
+  cam2.position.set(Math.sin(heroTheta) * 240 * SCALE, 165 * SCALE, Math.cos(heroTheta) * 240 * SCALE); cam2.lookAt(0, 8, 0);
   buildings.forEach((b) => { b.sprite.scale.set(b.i === heroHover ? 34 : 26, b.i === heroHover ? 8.5 : 6.5, 1); });
   r2.render(scene, cam2);
 }
