@@ -348,7 +348,7 @@ export function bodyHTML(projects: Project[], profile: Profile, reel: Showreel) 
         <p class="sv-sub">Every project in one video. Pick a chapter to jump straight to it.</p>
         <div class="sv-reelwrap">
           <div class="sv-media" id="svReel">${reel.video
-            ? `<video id="svReelVid" src="${esc(reel.video)}" controls playsinline preload="metadata"></video>`
+            ? `<video id="svReelVid" src="${esc(reel.video)}" controls playsinline muted loop preload="metadata" data-auto></video>`
             : `${PLAY}<small>Showreel coming soon</small>`}</div>
           <div class="sv-chapters" id="svChapters" role="group" aria-label="Showreel chapters">${chaptersHTML(projects, reel)}</div>
         </div>

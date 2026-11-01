@@ -211,15 +211,19 @@ function cardVideo(media, on) {
   if (!v) return;
   if (on) v.play().catch(() => {}); else { v.classList.remove("on"); v.pause(); v.remove(); }
 }
-const inView = "IntersectionObserver" in window ? new IntersectionObserver((es) => es.forEach((e) => {
-  const el = e.target, on = e.isIntersecting && e.intersectionRatio >= 0.6 && view === "simple";
-  if (el.tagName === "VIDEO") { if (on) el.play().catch(() => {}); else el.pause(); } else cardVideo(el, on);
-}), { threshold: [0, 0.6] }) : null;
-function watchSimpleVideos() {
-  if (!inView) return;
-  document.querySelectorAll("#simple video[data-auto]").forEach((v) => inView.observe(v));
-  if (coarse) document.querySelectorAll("#sGrid .sv-media[data-hover]").forEach((m) => inView.observe(m));
+/* a plain on-screen check, run on scroll, resize and view changes: no reliance on IntersectionObserver timing */
+function shownRatio(el) {
+  const r = el.getBoundingClientRect(); if (!r.height) return 0;
+  return Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0)) / r.height;
 }
+function watchSimpleVideos() {
+  const on = (el) => view === "simple" && shownRatio(el) >= 0.6;
+  document.querySelectorAll("#simple video[data-auto]").forEach((v) => { if (on(v)) { if (v.paused) v.play().catch(() => {}); } else if (!v.paused) v.pause(); });
+  if (coarse) document.querySelectorAll("#sGrid .sv-media[data-hover]").forEach((m) => cardVideo(m, on(m)));
+}
+let svTick = 0;
+$("simple").addEventListener("scroll", () => { clearTimeout(svTick); svTick = setTimeout(watchSimpleVideos, 120); }, { passive: true });
+window.addEventListener("resize", () => { clearTimeout(svTick); svTick = setTimeout(watchSimpleVideos, 120); });
 $("sGrid").addEventListener("pointerover", (e) => {
   if (e.pointerType !== "mouse") return;
   const m = e.target.closest(".sv-card")?.querySelector(".sv-media[data-hover]"); if (m && !m.contains(e.relatedTarget)) cardVideo(m, true);
@@ -301,6 +305,7 @@ function setView(v) {
   if (v !== "simple") { closeCard(); leaveArrival(); } else { $("simple").scrollTop = simpleScroll; }
   markTried(v); hideHint(); scheduleHint(12000);
   if (hooks.onView) hooks.onView(v);
+  setTimeout(watchSimpleVideos, 60);   /* start or stop the 1-page videos for the new view */
 }
 function setLook(l) {
   look = l;
