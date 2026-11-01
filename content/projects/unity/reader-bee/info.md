@@ -21,6 +21,7 @@ built:
   - Subscription system
   - Offline data with SQLite
   - Content delivery from Amazon S3
+  - Automated play-through tests that read the stories end to end (shown in the demo)
 visibility: 'yes'
 stack:
   - - Client
@@ -31,6 +32,8 @@ stack:
     - SQLite offline persistence
   - - Business
     - Subscription management
+media:
+  video: media/ReaderBee Bot Demo.mp4
 district: mobile
 order: 17
 height: 16
