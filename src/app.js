@@ -1044,7 +1044,7 @@ const CHARACTERS = {
   "virtual-mom": { type: "parent", label: "Virtual Mom", hi: "Busy day at home today!" },
   /* the six projects added after the prototype, in the same style */
   "you-will-die": { type: "zombie", label: "Zombie", hi: "Braaains… You Will Die!" },
-  "tank-game": { type: "tanker", label: "Tank commander", hi: "Tanks rolling! Watch your six." },
+  "sales-bets-game": { type: "banker", label: "The dealmaker", hi: "Place your bets. The city is open!" },
   "hack-and-slash-arpg": { type: "swordsman", label: "Serath", hi: "Blades ready. Face the boss!" },
   "space-fighter": { type: "marine", label: "Space marine", hi: "Gear up, pilot!" },
   "scifi-sim-escape": { type: "robot", label: "Enforcer", hi: "Intruder detected. Can you escape?" },
