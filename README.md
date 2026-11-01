@@ -68,6 +68,10 @@ npm run media
 
 It needs [ffmpeg](https://ffmpeg.org/). If ffmpeg isn't on your `PATH`, set `FFMPEG` to its full path. Outputs go to `public/projects/<id>/preview.mp4`, `full.mp4` and `poster.webp`, and these are committed. Add `-- --force` to regenerate existing ones.
 
+## Showcase videos
+
+A project with several clips can join them into one titled video by adding `media.showcase` to its `info.md`: an intro card (`tagline`, `built`, `pills`, `blurb`) and one `sections` entry per clip (`clip`, `label`, `title`, `text`). The default `mode: framed` frames each clip over a blurred copy of itself with the section text on the left; `mode: join` plays clips as they are, with a divider card before any section that has a `title`. `npm run media` renders it to `full.mp4` (delete that file to re-render). Title cards use Windows fonts (Segoe UI, Arial).
+
 ## Character models
 
 Each building has a character outside it. Without a model it's a placeholder built from simple shapes. To use a real one, put a `.glb` file in the project's `media/` folder and set `media.character`. The model is scaled to the stage, so any size works. Keep it under about 5 MB, facing +Z (glTF default), with feet at the origin. If it has animation clips, one named `Idle` loops, and one named `Wave` (or `Greet`, `Talk`) plays while a visitor is parked there.

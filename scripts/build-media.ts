@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadProjectEntries, publicProjectsDir, root } from "./projects";
+import { buildShowcase } from "./showcase";
 
 const ffmpeg = process.env.FFMPEG ?? "ffmpeg";
 const ffprobe = process.env.FFPROBE ?? ffmpeg.replace(/ffmpeg(\.exe)?$/i, (_, ext = "") => `ffprobe${ext}`);
@@ -73,7 +74,12 @@ for (const { project, dir } of entries) {
   }
 
   // the whole video, with sound, for the project cards and the 1-page site
-  if (force || !existsSync(full)) {
+  if (project.media.showcase && (force || !existsSync(full))) {
+    // several clips joined into one titled showcase
+    buildShowcase(project, dir, full, ffmpeg, duration);
+    console.log(`media: ${project.id} showcase ${mb(full)} MB (${Math.round(duration(full))}s, ${project.media.showcase.sections.length} sections)`);
+    made++;
+  } else if (force || !existsSync(full)) {
     run([
       "-i", source, "-map", "0:v:0", "-map", "0:a:0?",
       "-vf", "scale='min(1280,iw)':-2:flags=lanczos,fps=30",

@@ -28,6 +28,14 @@ featured: true
 order: 1
 media:
   video: media/KingdomLand_Portfolio_Showcase (1).mp4
+  showcase:
+    mode: join
+    sections:
+      - clip: "media/KingdomLand_Portfolio_Showcase (1).mp4"
+      - clip: "media/KingdomLand3D_Investor_Demo_v2 (1).mp4"
+        label: "Part 2"
+        title: "KingdomLand 3D"
+        text: "Investor demo with live in-app gameplay"
 stack:
   - - UI
     - 'Start screen, menus and video background'

@@ -30,6 +30,27 @@ export const projectSchema = z.object({
       start: z.number().min(0).optional(),
       character: z.string().optional(),
       gallery: z.array(z.string()).default([]),
+      // several clips joined into one showcase video (see scripts/showcase.ts)
+      showcase: z
+        .object({
+          // framed: title cards and each clip framed over a blurred copy of itself; join: clips as-is with divider cards
+          mode: z.enum(["framed", "join"]).default("framed"),
+          tagline: z.string().default(""),
+          built: z.string().default(""),
+          pills: z.array(z.string()).default([]),
+          blurb: z.string().default(""),
+          sections: z
+            .array(
+              z.object({
+                clip: z.string(),
+                label: z.string().default(""),
+                title: z.string().default(""),
+                text: z.string().default(""),
+              }),
+            )
+            .min(1),
+        })
+        .optional(),
     })
     .default({ gallery: [] }),
   // lines the building's character says when you park there (falls back to the summary)
