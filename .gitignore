@@ -16,3 +16,7 @@ content/me/Maaz_Resume_Europass.pdf
 content/me/*.pdf
 
 reference/
+
+# everything in content/me is private except the profile the site is built from
+content/me/*
+!content/me/profile.md
