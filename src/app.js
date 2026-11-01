@@ -69,12 +69,12 @@ let arrivedIdx = -1;
 function showDetails(i) { if (i < PROJECTS.length) openCard(i); else openSpecial(SPECIALS[i - PROJECTS.length].kind); document.body.classList.add("paneled"); }
 function leaveArrival() { arrivedIdx = -1; endTheater(); document.body.classList.remove("cine", "arrived", "paneled"); }
 /* theater: a banner's video played large, with the project panel beside it */
-let theaterIdx = -1;
+let theaterIdx = -1, theaterMode = false;   /* mode: the visitor is watching; survives a project with no video while paging */
 function openTheater(i) {
   const p = i < PROJECTS.length ? PROJECTS[i] : null;
   if (hooks.tour && document.body.classList.contains("touring")) hooks.tour.stop();
-  if (view === "simple" || !p || !p.media.video) { endTheater(); showDetails(i); return; }
-  document.body.classList.add("theater"); theaterIdx = i;
+  if (view === "simple" || !p || !p.media.video) { const keep = view !== "simple" && theaterMode; endTheater(); theaterMode = keep; showDetails(i); return; }
+  document.body.classList.add("theater"); theaterIdx = i; theaterMode = true;
   showDetails(i); hooks.onTheater?.();
   const v = $("thVid");
   if (v.dataset.i !== String(i)) { v.src = p.media.video; v.poster = p.media.poster || ""; v.dataset.i = String(i); }
@@ -82,7 +82,7 @@ function openTheater(i) {
   v.focus({ preventScroll: true });   /* keyboard and screen-reader users land on the player */
 }
 function endTheater() {
-  theaterIdx = -1;
+  theaterIdx = -1; theaterMode = false;
   if (!document.body.classList.contains("theater")) return;
   const hadFocus = $("theater").contains(document.activeElement);
   document.body.classList.remove("theater"); $("thVid").pause();
@@ -167,7 +167,7 @@ function closeCard() {
 }
 function goTo(i) {
   if (view === "drive" && hooks.driveTo) hooks.driveTo(i);
-  else { if (theaterIdx >= 0) openTheater(i); else openCard(i); if (view === "spectate" && hooks.focus) hooks.focus(i); }
+  else { if (theaterIdx >= 0 || theaterMode) openTheater(i); else openCard(i); if (view === "spectate" && hooks.focus) hooks.focus(i); }
 }
 $("cClose").addEventListener("click", closeCard);
 $("cNext").addEventListener("click", () => goTo((Math.max(cardIndex, 0) + 1) % PROJECTS.length));
@@ -406,6 +406,7 @@ const amb = new THREE.AmbientLight(0x223047, 0.5); scene.add(amb);
 const PITCH = 58, NX = 5, NZ = 5, HALF = 11, LOT = PITCH - 18, PAD_Z = LOT / 2 + 6;   /* roads stay 18 wide; LOT = the slab each building stands on */
 const lotCenter = (i, j) => new THREE.Vector3((i - (NX - 1) / 2) * PITCH, 0, (j - (NZ - 1) / 2) * PITCH);
 const EX = NX / 2 * PITCH + 18, EZ = NZ / 2 * PITCH + 18, EXTENT = Math.max(EX, EZ), SCALE = EXTENT / 133;   /* 133 = the old city's extent, for scaling world-wide numbers */
+FOG.day.near *= SCALE; FOG.day.far *= SCALE; FOG.night.density /= SCALE; FOG.bp.density /= SCALE;
 sc.left = -(EXTENT + 20); sc.right = EXTENT + 20; sc.top = EXTENT + 20; sc.bottom = -(EXTENT + 20); sc.updateProjectionMatrix();
 /* districts = portfolio sections, one per row */
 /* lots are filled in project order (favourites first, projects without video last): the row facing the spawn first, then outward */
@@ -581,11 +582,12 @@ function wrapSet(i) {
 function facadeMats(i, k) { return { wrap: { i, k } }; }
 /* map each side face of a box into its variation's band of the atlas, as a cover-fit window of the 16:9 art (never stretched);
    faces 0,1 = sides, 4,5 = front (street side) and back; the roof and floor (2,3) sample the plain strip */
+const BAND_INSET = 8;   /* px: covers mip levels up to 1/8 size, i.e. Spectate distance */
 function fitBoxUV(geo, k) {
   const { width: W, height: H, depth: D } = geo.parameters, uv = geo.attributes.uv;
   [[0, D, H, (k + 1) % 3], [1, D, H, (k + 2) % 3], [4, W, H, k % 3], [5, W, H, (k + 1) % 3]].forEach(([f, fw, fh, n]) => {
     const af = fw / fh, su = af > WRAP_ASPECT ? 1 : af / WRAP_ASPECT, sv = af > WRAP_ASPECT ? WRAP_ASPECT / af : 1;
-    const v0 = 1 - ((n + 1) * WRAP_H - 1.5) / ATLAS_H, v1 = 1 - (n * WRAP_H + 1.5) / ATLAS_H;   /* the band, inset so filtering never reaches its neighbour */
+    const v0 = 1 - ((n + 1) * WRAP_H - BAND_INSET) / ATLAS_H, v1 = 1 - (n * WRAP_H + BAND_INSET) / ATLAS_H;   /* the band, inset so filtering never reaches its neighbour */
     for (let v = f * 4; v < f * 4 + 4; v++) uv.setXY(v, 0.5 + (uv.getX(v) - 0.5) * su, v0 + (0.5 + (uv.getY(v) - 0.5) * sv) * (v1 - v0));
   });
   for (let v = 8; v < 16; v++) uv.setXY(v, 0.5, ROOF_V);
@@ -779,7 +781,7 @@ PROJECTS.forEach((p, i) => {
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex.day, transparent: true, depthWrite: false }));
   sprite.scale.set(16, 4, 1); sprite.position.set(c.x, Math.max(info.top, BANNER_TOP) + 5, c.z); sprite.userData = { label, tex }; scene.add(sprite);
   const tag = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), new THREE.MeshBasicMaterial({ map: plotTag(i + 1, CSSCOL[p.engine]), transparent: true }));
-  tag.rotation.x = -Math.PI / 2; tag.position.set(c.x - 8, 0.38, c.z + 12.2); scene.add(tag); notBp.push(tag);
+  tag.rotation.x = -Math.PI / 2; tag.position.set(c.x + 8, 0.38, c.z + 12.2); scene.add(tag); notBp.push(tag);
   const pad = new THREE.Mesh(new THREE.RingGeometry(4.2, 5.4, 40), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
   pad.rotation.x = -Math.PI / 2; pad.position.set(c.x, 0.2, c.z + PAD_Z); scene.add(pad);
   buildings.push({ p, i, holder, sprite, pad, center: c, padPos: pad.position.clone(), h: info.top, banner, yaw });
@@ -1342,10 +1344,12 @@ function addPalm(x, z) {
 }
 for (let i = 0; i < NX; i++) for (let j = 0; j < NZ; j++) {
   const c = lotCenter(i, j);
-  if (PARK_LOTS.some(([a, b]) => a === i && b === j)) { [[-7, -7], [0, -8], [7, -6], [-6, 2], [6, 3], [-2, 8], [8, 9]].forEach(([dx, dz]) => addPalm(c.x + dx, c.z + dz)); continue; }
+  if (PARK_LOTS.some(([a, b]) => a === i && b === j)) { [[-7, -7], [0, -8], [7, -6], [-6, 2], [6, 3], [-2, 8], [8, 9], [-9, 9], [9, -9], [1, 1], [-9, -2]].forEach(([dx, dz]) => addPalm(c.x + dx * LOT / 28, c.z + dz * LOT / 28)); continue; }
   [[-(LOT / 2 - 1.5), -(LOT / 2 - 1.5)], [LOT / 2 - 1.5, -(LOT / 2 - 1.5)]].forEach(([dx, dz]) => addPalm(c.x + dx, c.z + dz));   /* front corners stay clear so banners are never blocked */
 }
-for (let x = -LX + 8; x <= LX - 8; x += 21) { addPalm(x, -LZ + 8); addPalm(x, LZ - 8); } for (let z = -LZ + 8; z <= LZ - 8; z += 19) { addPalm(-LX + 8, z); addPalm(LX - 8, z); }
+{ const nx = Math.round((LX - 8) * 2 / 21), nz = Math.round((LZ - 8) * 2 / 19);
+  for (let k = 0; k <= nx; k++) { const x = -LX + 8 + k * (LX - 8) * 2 / nx; addPalm(x, -LZ + 8); addPalm(x, LZ - 8); }
+  for (let k = 1; k < nz; k++) { const z = -LZ + 8 + k * (LZ - 8) * 2 / nz; addPalm(-LX + 8, z); addPalm(LX - 8, z); } }   /* corners come from the x rows only */
 
 /* clouds (day) */
 const clouds = new THREE.Group(); scene.add(clouds); dayOnly.push(clouds);
@@ -1697,7 +1701,7 @@ function renderHero(dt) {
   const w = hc.clientWidth, h = hc.clientHeight; if (!w || !h) return;
   if (hc.width !== Math.floor(w * r2.getPixelRatio()) || hc.height !== Math.floor(h * r2.getPixelRatio())) { r2.setSize(w, h, false); cam2.aspect = w / h; fitFov(cam2, w / h, 38); cam2.updateProjectionMatrix(); }
   if (!reduceMotion && heroHover < 0 && !heroDrag && performance.now() - heroLast > 1500) heroTheta += dt * 0.12;
-  cam2.position.set(Math.sin(heroTheta) * 240 * SCALE, 165 * SCALE, Math.cos(heroTheta) * 240 * SCALE); cam2.lookAt(0, 8, 0);
+  cam2.position.set(Math.sin(heroTheta) * 266 * SCALE, 182 * SCALE, Math.cos(heroTheta) * 266 * SCALE); cam2.lookAt(0, 8, 0);
   buildings.forEach((b) => { b.sprite.scale.set(b.i === heroHover ? 34 : 26, b.i === heroHover ? 8.5 : 6.5, 1); });
   r2.render(scene, cam2);
 }
@@ -1745,7 +1749,10 @@ function setHidden(list) {
   list.forEach((o) => { o.holder.visible = false; o.sprite.visible = false; });
   hiddenOccluders = list;
 }
-function insideBuilding(x, y, z) { return buildings.some((b) => Math.abs(x - b.center.x) < HALF + 2 && Math.abs(z - b.center.z) < HALF + 2.5 && y < b.h + 2); }
+function insideBuilding(x, y, z) {
+  return buildings.some((b) => Math.abs(x - b.center.x) < HALF + 2 && Math.abs(z - b.center.z) < HALF + 2.5 && y < b.h + 2) ||
+    colliders.some((c) => c.y0 !== undefined && y > c.y0 - 1 && y < c.h + 1 && insideCollider(c, x, z));   /* raised banner screens */
+}
 function step(now) {
   requestAnimationFrame(step);
   const rawDt = Math.min((now - last) / 1000, 0.25), dt = frameCap != null ? frameCap : Math.min(rawDt, 0.05); last = now; t += dt;

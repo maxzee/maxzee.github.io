@@ -1,0 +1,282 @@
+https://play.google.com/store/apps/details?id=com.kick.arena&hl=en
+
+How can I increase retention of our game, the game is kick arena a football game penalty goal keeper stuff happening, please let me know the best way to increase retention and in app purchases and stuff, and the downloads please. some reallyt creative ideas and ways.
+
+I can't open the Play Store link from here, so this is based on your description (penalty shootouts, striker and goalkeeper). If you share your current numbers and core loop, I can make it much more specific. Here's how I'd approach it.
+
+First, find where players leave
+
+Ideas only help if they fix the right leak. Before building anything, check three things in your analytics:
+
+D1 retention. If it's below ~30–35%, the problem is the first 5 minutes: onboarding, feel, or difficulty. Fix this before adding features.
+D7 and D30. If D1 is fine but D7 collapses, players are running out of reasons to come back. You need goals, progression, and social hooks.
+Session funnel. Look at which level, match, or screen people quit on. Penalty games often lose players at a difficulty spike or when the first paywall or forced ad appears.
+
+Penalty games have a natural strength: sessions are 30 seconds and every kick is a small moment of tension. Your job is to wrap that moment in reasons to return.
+
+Retention ideas
+
+The daily penalty. One shared challenge per day, the same for every player worldwide: a set keeper, wind, and angle, and you get three attempts. Afterward you get a shareable result card, like Wordle's emoji grid (⚽🧤❌⚽⚽). It's cheap to build and creates a daily habit plus free marketing.
+
+Async penalty duels with friends and rivals. You take 5 shots and record them. Your friend later keeps goal against your recorded shots, then shoots 5 at your ghost keeper. There's no need for real-time netcode, and it works across time zones. Push notifications like "Ahmed saved 3 of your shots, take revenge" are some of the strongest retention notifications you can send.
+
+A nemesis system. If a specific AI keeper or player beats you, they become your named rival. They taunt you, show up again later, and remember your habits ("he knows you always shoot left"). This turns losses into motivation instead of a reason to quit.
+
+Mind games as a mechanic. Real penalties are psychological. Let strikers do stutter run-ups, fake glances, or a Panenka. Let keepers do "the dance" on the line and show tells to read. This adds depth that keeps skilled players around for months, not just days.
+
+A career mode with stakes. Give players a journey from street football, to local club, to national team, to the final. End each chapter with a sudden-death shootout that actually feels like a final. A story gives casual players a reason to continue.
+
+Streaks with a safety net. Daily login and win streaks, plus a "streak freeze" players can earn or buy. Losing a 20-day streak makes people quit, so protecting it keeps them.
+
+Weekly leagues. Group players into leagues of about 30 by skill, with promotion and relegation every week. That's short enough to feel winnable and gives a reason to play every few days.
+
+In-app purchases
+
+The rule for penalty games: sell expression and convenience, never direct advantage in PvP. Once players feel they lost a duel to someone who paid, they leave.
+
+Celebrations are your best cosmetic, because players show them off after every goal. Knee slides, signature poses, and team-style celebrations suit a penalty game perfectly.
+Ball trails, boots, keeper gloves, net-ripple effects, and goal explosions. These are visible, cheap to make, and satisfying.
+A season pass. It needs a free track and a paid track over 4–6 weeks, full of cosmetics. It's usually the single biggest revenue and retention lever once you have daily and weekly goals feeding it.
+Rewarded ads at emotional moments. "Missed the winning penalty? Watch an ad to retake it." Players opt in happily because it's their choice at the peak of frustration. Avoid forced interstitials in the first few sessions, because they hurt D1.
+A one-time starter pack after the first win, when goodwill is highest, plus a "remove ads + VIP" option.
+Stadium customization as a long-term meta layer: upgrade your home stadium, crowd, lighting, and banners. This gives spenders and grinders something permanent to build.
+Downloads
+
+Make the game market itself. Auto-generate a 10-second clip of a player's best goal or save, with slow-motion and the crowd roar, and give them one tap to share to TikTok, Snapchat, or WhatsApp. Crazy saves and top-corner goals are natural short-form content.
+
+Referral rewards on both sides. "Invite a friend and both get an exclusive celebration." Async duels make this far stronger, because there's an obvious reason to invite someone.
+
+Store listing (ASO). The first two screenshots and the video should show the tension moment: keeper diving, ball flying, a slow-motion near miss. Target keywords like penalty, goalkeeper, football, and shootout. A full Arabic listing is also worth doing if you haven't: Arabic store pages are often less competitive than English ones for the same keywords.
+
+Time your events with the football calendar. Run limited events on big match days, league derbies, and season openers. Regionally, Ramadan nights (evening play spikes), Saudi National Day, and Founding Day are strong moments for themed events and cosmetics. The build-up toward the 2034 World Cup in Saudi Arabia will keep football interest high for years.
+
+Playable ads. A single penalty kick as a playable ad converts well for this genre because it shows the whole game in 5 seconds.
+
+A caution: avoid real player names, club badges, or kits unless you have licenses. Stores do remove games for this, and original rivals and teams work fine.
+
+What I'd do first
+
+If I had to pick an order: fix D1 onboarding if it's weak, then add the daily penalty and shareable clips (cheap, and they help both retention and downloads), then async duels, then the season pass once there's enough daily activity to feed it. Doing one at a time also lets you measure what each change actually did.
+
+What are your current D1 and D7 numbers, and does the game have PvP yet or is it single-player only? That would tell me which of these to prioritize for you.
+
+KickArena.md
+MD
+
+Please go through this, Thanks.
+
+I went through the parts of the doc that affect retention, monetization and downloads: FTUE, the career loop, the economy, ads and IAP, analytics, notifications, multiplayer rules, and the known-issues list. I didn't read all 12,800 lines of per-file reference.
+
+The doc also corrects something I assumed last time. Kick Arena is mainly a free-kick puzzle game (obstacles, ball types, 3 attempts, stars) with a 1v1 shootout mode on the side, not a pure penalty game. Some earlier ideas still apply, but they need adjusting, which I do below.
+
+The main finding: several of the biggest retention and revenue problems are bugs, not missing features. Fixing those will likely help more than any new feature.
+
+1. You can't measure retention properly yet
+
+This comes first, because without it you can't tell whether any other change worked.
+
+level_failed is never fired, and level duration is never recorded (LevelCompleteTimer never starts). You can't see which levels are walls where players quit.
+Firebase silently rejects most event names because they contain spaces or hyphens (Level Start, Game Exit, InApp-Purchase…). Your Firebase funnels are missing most of the game.
+Spin wheel events and most IAP events are dropped in Adjust, and coin packs 2–6 are mapped to the wrong names. Revenue attribution in Adjust is wrong.
+Settings and Marketplace "open" events fire once at boot, and Level Complete can fire twice, which inflates those numbers.
+
+PostHog looks like your most reliable source right now. Fixing this analytics layer is the step I'd take first.
+
+2. Possible real money loss in IAP
+The pending-purchase handler is commented out, so purchases may never be confirmed. On Google Play, purchases that aren't acknowledged within 3 days are refunded automatically. Check your Play Console order history for refunded purchases; this could be quietly removing revenue.
+Remove Ads ($4.99) is a consumable with no restore. Players who reinstall or change phones lose it, which leads to 1-star reviews. Reviews hurt your store rating, and your rating hurts downloads.
+There is no receipt validation, and currency is granted on the client. Also, deduct-coins with a negative amount adds coins. Anyone who finds that can give themselves unlimited coins, which breaks the economy.
+3. Ads are set up to lose money and annoy players
+Game Over "Watch Ad" shows an interstitial, not a rewarded ad, and refills turns even when no ad played. You lose the higher rewarded-ad revenue, and players get free continues.
+Game Over → Home shows an interstitial. That's an ad at the most frustrated moment in the game, which is when people uninstall. I'd remove it.
+Unity Ads test mode is on, and the backend points at STAGING. If the live Play build matches this doc, your fallback ads earn nothing. Worth checking which build is actually live.
+AdMob runs without the UMP consent flow, which reduces ad fill in Europe and the UK.
+4. Things that make players feel the game is unfair
+
+In a puzzle game, a miss that feels like the game's fault is what makes people quit.
+
+Curve and homing run in Update, so shots behave differently depending on frame rate. On cheap Android phones, which are a big share of your audience, the same swipe gives a different result.
+Glass walls can fade to invisible after aiming (the FieldOverrides alpha bug).
+Keeper difficulty isn't working as designed. Reaction time is fixed at 0.5 s, and the difficulty calculator orders the arenas wrongly. Your difficulty curve is probably not the one you designed.
+A 4xx response is treated as success and written into player data, and the access token isn't saved between launches. Any progress loss is a major churn trigger.
+5. The economy has friction in the wrong place
+Every level costs 20 coins, including pressing Next. In a puzzle game, that feels like being charged to keep playing. When coins run out, players either watch an ad or leave. I'd consider making levels free and charging instead for extra attempts or hints, which is where puzzle games normally make money.
+Diamonds have almost nothing to spend on. They only buy arenas, and all cosmetics cost coins (0/300/600). That makes the diamond packs weak value, so give diamonds premium cosmetics.
+SignUpBonusView is listed as never opened in the dead-code section, but the FTUE section describes it opening. Check which is true; a missing welcome bonus hurts D1.
+The popup chain (daily reward, IAP offer) only runs if the metadata request succeeds. When it fails, players silently miss their daily reward and their streak, and you lose the habit you're trying to build.
+6. Re-engagement is almost non-existent
+
+There's one generic notification ("Your Team Needs You!") one hour after closing the app, and it's often queued twice. You already have FCM and local notifications, so this is cheap to improve:
+
+"Your free spin is ready."
+"Day 5 reward waiting, don't lose your streak."
+"You're 1 star away from unlocking Night Stadium."
+"A friend challenged you."
+
+These specific messages usually perform far better than generic reminders.
+
+Revised creative ideas for this game
+
+These build on systems you already have:
+
+A daily level from your LevelGenerator. Everyone gets the same puzzle each day, with a shareable score card. This gives a daily habit and free marketing using code you already have.
+A "show trajectory" hint using your existing aim preview (ProjectilePath). Offer it for an ad or diamonds. Hints are the classic puzzle-game purchase.
+A 4th ball after 3 misses, for a proper rewarded ad or diamonds. This replaces the broken Game Over flow.
+Ball skins and trails (fire, electric, cannonball styles) sold for diamonds. Your ball types already make these look good, and they fix the diamond-sink problem.
+"Beat my shot" challenges. Share a level and your score through the deep links and 6-digit room codes you already have.
+Use the 4 planned arenas (Volcano, Snow, Jungle, Desert) as scheduled content drops. The Desert arena fits well with a Saudi National Day or Ramadan event.
+
+Multiplayer needs to be fixed before it's promoted. Winner and loser are swapped in FinishMatch, Quick Match is always a bot, and the server shuts down after 210 s, which is shorter than a long match.
+
+Suggested order, one change at a time
+Fix analytics (event names, level_failed, level duration) so you can measure everything after it.
+Fix IAP confirmation, make Remove Ads non-consumable, and add a restore button.
+Fix the Game Over flow: use a proper rewarded ad for extra attempts and remove the interstitial there.
+Make shots frame-rate independent and fix the invisible glass walls.
+Rework the level fee and add hints.
+Add better notifications and the daily level.
+
+Separately, the hardcoded server secret and the committed JWTs are security issues to fix regardless of retention.
+
+Do you know which build is currently live on Play, the staging-configured one described here or a different one? That decides whether items 2 and 3 are urgent now or just need to be fixed before the next release.
+
+The goal is the objective, the zombies are the clock
+
+This answers your "does it become easy when a few die?" question directly.
+
+You win by scoring goals in the enemy goal to reclaim the stadium. For example, a level might need 3 goals. Getting there means solving the puzzle: obstacles, helpers, ball types.
+The zombies never run out. They keep coming out of the tunnels until you score your final goal, and the longer you take, the faster and tougher they come. Killing zombies never "finishes" the level. It buys you time to work on the puzzle.
+Each goal triggers a Goal Blast, a celebration shockwave that wipes out the zombies near your goal. Scoring is your strongest attack, so the puzzle and the horde feed into each other.
+
+That gives every single kick a real decision: go for the goal, or defend? A shot at the goal might fail and leave zombies free to walk in. A defensive shot keeps you safe but doesn't progress the level. The best players do both at once, with a kick that ricochets off two zombies, bounces off the spring pad, and goes in. That's your trick shot, and it's what players will clip and share.
+
+Zombies have three roles
+
+1. Pressure. Walkers, runners and crowds that advance on your goal. They're the timer, and they force you to act.
+
+2. Obstacle owners. This answers your unlock question. Some zombies are part of the puzzle, and killing them changes the level:
+
+A generator zombie carries the battery that powers the electric wall. Kill it and the wall shuts off.
+A builder zombie rebuilds walls you've broken, so you need to deal with it before it undoes your progress.
+A shield bearer holds a glass shield that only a fireball can break, the same rule as your glass walls.
+A key carrier drops a key or hits a switch that opens a door on the route to the goal.
+A portal zombie opens portals that let more zombies through. Kill it to close them.
+The keeper zombie guards the enemy goal and catches weak shots, using your existing keeper AI.
+A boss is a giant zombie that acts as a moving wall in front of the goal, with weak points from your bullseye targets.
+
+So zombies don't appear only when you want to unlock something, but many puzzles are solved by killing the right zombie at the right time.
+
+3. Things that interact with the pitch. Every element works on them too, which is the big connection you asked for:
+
+Lasers and spikes kill zombies that walk into them. Flipping a switch to turn a laser on across a zombie lane is a valid strategy.
+Breaking a wall opens your route to the goal, but it also opens a path for the zombies. Do you break it now, or wait?
+Fans push zombies back as well as curving your ball.
+Portals work for zombies too, so a zombie can step through and appear close to your goal.
+Spring pads launch zombies away, or launch them over a wall toward you if you're careless.
+Mud slows both the ball and the zombies.
+Relay teammates block zombies for a few seconds. If the zombies knock one down (cartoon-style), your passing chain breaks and the puzzle gets harder, so you want to protect your teammates.
+Ball types connect both sides
+
+Each ball type has a puzzle use and a combat use:
+
+Ball	Puzzle use	Combat use
+Fireball	Breaks glass walls	Burns zombies in an area, breaks shields
+Electric	Passes through electric walls	Chains between bunched zombies
+Cannonball	Breaks wooden walls	Pierces a whole line of zombies
+Splitter	Hits several targets at once	Spreads damage across lanes
+Golden Boot	Homes into the goal	Homes onto the nearest zombie
+
+Your delivery queue shows the next ball, so you plan around it. If a fireball is coming, you'd save it for the shield bearer or the glass wall in front of the goal, whichever is the bigger problem at that moment.
+
+Level types for variety
+
+Most levels would be Reclaim (score goals while holding off the horde), with other types mixed in so the campaign doesn't feel the same:
+
+Survive: hold out for 90 seconds, with no goal needed.
+Rescue: pass the ball to a trapped teammate before the zombies reach them.
+Boss: break a giant zombie's weak points.
+Training Ground: pure puzzle with no zombies, built from your existing levels, as a calm break.
+The meta connects to the same pieces
+
+Everything a player earns comes from the same pitch, and goes back into it:
+
+Killing zombies drops Ash, the upgrade material for your balls. That fits the name and theme.
+Goals and stars give coins and progress through the campaign.
+Your collected squad appears on the pitch as the relay teammates and blockers. Upgrading your winger improves the balls he crosses to you, and upgrading your defender makes him hold a lane longer. What you collect changes how levels play.
+Each stadium you reclaim rebuilds part of your home stadium base, which then earns idle coins.
+The daily seeded run and the weekly club boss use the same zombies, obstacles and helpers, so nothing you build is used only once.
+
+The full loop is: kick, solve the puzzle and fight the horde, earn ash and coins, upgrade balls and squad, return to harder stadiums. Every piece of the game feeds every other piece.
+
+Keeping it from getting too easy or too hard
+Escalation over time means the level doesn't get easier as zombies die. The pressure keeps building until you score.
+Hand-designed wave scripts per level decide which zombies appear and when, so you control the difficulty instead of relying on chance.
+Goal Blasts give relief at the right moment, which creates a natural rhythm of pressure, release, and pressure again.
+Quiet dynamic difficulty slightly slows the next attempt's waves after repeated losses, without players noticing.
+
+For the first prototype, I'd keep it to one Reclaim level: one breakable wall, one generator zombie, a relay teammate, and walker zombies on the escalation timer. If the "goal or defend" decision feels exciting in that one level, the rest of the design builds on it.
+
+Well, you know about portal game? There are a lot of puzzles in it, different different, can we include and blend any from that game or anything similar in our game? Please check if it strongly fits our game.
+
+Yes, Portal (Valve's game) is a great source, and some of its mechanics fit Kick Arena better than they fit most games. The reason is that Portal's puzzles are mostly about moving objects with physics, and your game is entirely about a physics object: the ball.
+
+Not everything fits, though. Here's my honest assessment.
+
+Fit check
+Portal mechanic	Kick Arena version	Fit
+Momentum through portals	Kick the ball into a portal at speed and it exits at the same speed in a new direction	Strong
+Weighted buttons	Hold a door open with a weight, which can be a zombie	Strong
+Gels (bounce, speed)	Gel balls that paint surfaces, affecting the ball and zombies	Strong
+Aerial catapults	Your spring pads and cannons	Strong (you have it)
+Laser redirection	Kick a mirror block to aim a laser at a receiver or a zombie lane	Good
+Tractor beams	A beam that carries balls and zombies slowly along it	Good
+Player-placed portals	Place one portal on marked surfaces before shooting	Good, but limited
+Light bridges	Temporary walls or ramps	Medium
+Turrets	Already covered by your zombies and drones	Weak (skip)
+The strongest blends
+
+Momentum portals. This is the core Portal idea and it suits football physics perfectly: "speed in, speed out." A ball that drops from a high ledge into a floor portal comes out of a wall portal flying fast. Puzzles become "how do I build up enough speed?" Your existing portals already redirect the ball, so this mainly extends them to keep momentum and to work in combination.
+
+Zombies as weights. This is the best fit for your game, because it connects the horde directly to the puzzles. A pressure plate opens the door in front of the goal, but only while something heavy stands on it. Your ball rolls off, so what holds it down? A zombie. Players knock or lure a zombie onto the plate, or use a fan or spring pad to push one there. Zombies are a threat, but they're also a puzzle tool. If the zombie gets killed or walks off, the door closes.
+
+Gel balls. Portal 2's gels translate into a new family of ball types that leave paint where they land:
+
+Bounce gel turns any surface into a bumper. Paint a wall, then bank your next shot off it. Zombies walking on it get bounced away.
+Speed gel makes the ground fast. Your ball gains speed rolling across it, but zombies walking on it speed up too, so where you paint it matters.
+Sticky gel (your own addition) stops zombies in place for a few seconds.
+
+These work in both the puzzle and the horde, and they create planning: paint first, then shoot through the painted route.
+
+Laser redirection. You already have laser walls. Add mirror blocks that your ball can knock to rotate or slide. Aim the laser at a receiver to open a door, or swing it across a zombie lane to clear it. It's one mechanic with a puzzle use and a combat use.
+
+Where Portal doesn't fit as well
+
+Free portal placement is hard on mobile. In Portal you aim a gun at any white surface with a mouse. On a phone, with a behind-the-kicker camera, precise placement under zombie pressure would be fiddly. The better version is limited placement: only marked surfaces accept portals, and players place them during a short planning phase before the wave starts, or with a single tap.
+
+Long multi-step puzzles clash with the horde. Portal's puzzles are slow and thoughtful, with no time pressure. When zombies are walking at your goal, a five-step puzzle becomes frustrating. So I'd split it:
+
+Horde levels use quick versions: one or two steps, like "knock the zombie onto the plate, then shoot."
+Training Ground levels (your current puzzle mode, without zombies) are where the deep Portal-style puzzles go: chained portals, gels, lasers and mirrors, solved at your own pace.
+
+That way both kinds of player get what they want, and the same mechanics carry over between modes.
+
+A story link that ties it all together
+
+Your Sci-fi arena could become "The Lab": a research facility where an experiment went wrong and created the zombies. The lab is where portals, gels and lasers come from, and why they're scattered across the other stadiums. This gives a reason for the sci-fi elements to exist in a football game, connects the puzzles to the zombies in the story, and gives you a natural home for the most Portal-like levels.
+
+The design lesson worth taking
+
+The thing Portal does best isn't any single mechanic. It's how it teaches:
+
+Introduce one mechanic alone, in a safe room.
+Test it with a small twist.
+Combine it with a mechanic the player already knows.
+Later, combine it in a way that surprises them.
+
+That structure suits your level design well, and it matches your one-change-at-a-time approach: each new element gets its own introduction before it's mixed with the rest.
+
+One caution
+
+Game mechanics like portals and gels can't be owned, but Portal's specific look and names can. Avoid the orange-and-blue portal rings, the companion cube, and names like Aperture or GLaDOS. Use your own colors and style, such as green and purple portals that match your color language, and your own names.
+
+My recommendation: start with zombies as weights, since it's the most original blend and connects the two halves of the game directly. Then add gel balls as a new ball family, because they extend both the puzzle and the horde and give your ball collection more depth.
