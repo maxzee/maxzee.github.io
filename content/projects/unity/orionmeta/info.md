@@ -22,7 +22,7 @@ built:
   - Virtual world exploration and social features
   - Browser performance and compatibility
 visibility: 'yes'
-featured: true
+featured: false
 media:
   video: >-
     media/Enterprise Metaverse Development – Orion Platform (Unity, WebGL,
@@ -37,7 +37,7 @@ stack:
   - - Data
     - MongoDB and blockchain integration
 district: mobile
-order: 7
+order: 9
 height: 30
 ---
 

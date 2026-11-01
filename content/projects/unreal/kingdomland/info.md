@@ -25,7 +25,7 @@ built:
   - Localized UI in English and Arabic
 visibility: 'yes'
 featured: true
-order: 1
+order: 2
 media:
   video: media/KingdomLand_Portfolio_Showcase (1).mp4
   showcase:

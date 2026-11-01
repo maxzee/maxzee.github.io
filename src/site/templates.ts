@@ -127,7 +127,7 @@ const PLAY_ICON = (size: number) => `<svg width="${size}" height="${size}" viewB
 export function mediaHTML(p: Project, big: boolean) {
   const bar = `<span class="bar" style="background:${CSSCOL[p.engine]}"></span>`;
   if (big && p.media.video) {
-    return `<video src="${esc(p.media.video)}"${p.media.poster ? ` poster="${esc(p.media.poster)}"` : ""} controls playsinline preload="none"></video>`;
+    return `<video src="${esc(p.media.video)}"${p.media.poster ? ` poster="${esc(p.media.poster)}"` : ""} controls playsinline muted loop preload="none" data-auto></video>`;
   }
   if (p.media.poster) return `<img src="${esc(p.media.poster)}" alt="${esc(p.name)} screenshot" loading="lazy">${bar}`;
   return `${PLAY}<small>${p.visibility === "pending" ? "Footage after studio approval" : "Demo video coming soon"}</small>${bar}`;
@@ -170,7 +170,7 @@ export function cardHTML(p: Project, i: number) {
   const dev = p.status === "in-development";
   const badge = hasInfo || dev ? `<span class="sv-badge${dev ? " dev" : ""}">${STATUS_BADGE[p.status]}</span>` : "";
   return (
-    `<li><button type="button" class="sv-card" data-card="${i}"><span class="sv-media">${badge}${mediaHTML(p, false)}</span><span class="in"><strong>${esc(p.name)}</strong>` +
+    `<li><button type="button" class="sv-card" data-card="${i}"><span class="sv-media"${p.media.video ? ` data-hover="${esc(p.media.video)}"` : ""}>${badge}${mediaHTML(p, false)}</span><span class="in"><strong>${esc(p.name)}</strong>` +
     `<span class="m">${esc([p.engineLabel, p.platform].filter(Boolean).join(", ") || "Engine to be added")}</span>` +
     `<span class="r">${p.visibility === "pending" ? "In development" : hasInfo ? esc(p.role) : "Details coming soon"}</span>` +
     (p.summary ? `<span class="sum">${esc(p.summary)}</span>` : "") +

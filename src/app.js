@@ -20,7 +20,7 @@ const SPECIALS = [
   { kind: "about", name: "About me", sub: "My studio", color: "#FFD24A" },
   { kind: "contact", name: "Contact", sub: "Radio tower", color: "#7EE08F" },
 ];
-const TOUR = ["kingdomland", "nayzak", "orionmeta", "kungfu-karate", "mars-simulation", "contact"];
+const TOUR = ["wahm", "kingdomland", "mars-simulation", "scifi-sim-escape", "island-of-deceit", "hack-and-slash-arpg", "contact"];
 function stopInfo(i) {
   if (i < PROJECTS.length) { const p = PROJECTS[i]; return { name: p.name, sub: p.engineLabel || "Details coming soon", color: CSSCOL[p.engine], role: p.role }; }
   const sp = SPECIALS[i - PROJECTS.length]; return { name: sp.name, sub: sp.sub, color: sp.color, role: "" };
@@ -176,7 +176,7 @@ $("c3d").addEventListener("click", () => { const i = cardIndex; setView("drive")
 
 /* ---------- simple view (2D site): markup is pre-rendered at build time; this wires it up ---------- */
 let filter = "all";
-function renderGrid() { $("sGrid").innerHTML = gridHTML(PROJECTS, filter); }
+function renderGrid() { $("sGrid").innerHTML = gridHTML(PROJECTS, filter); watchSimpleVideos(); }
 const svMore = $("svMore");
 if (svMore) svMore.addEventListener("click", (e) => {
   const box = $("svReview"); box.classList.toggle("open"); const o = box.classList.contains("open");
@@ -198,6 +198,38 @@ $("simple").addEventListener("click", (e) => {
     if (v && c.at != null) { v.currentTime = c.at; v.play().catch(() => {}); } else if (i >= 0) enter3D(i); }
 });
 $("shade").addEventListener("click", () => closeCard());
+
+/* 1-page site videos: featured videos autoplay (muted) while on screen; project cards play on hover like YouTube,
+   or, on touch screens, while the card is mostly in view */
+const coarse = window.matchMedia("(pointer: coarse)").matches;
+function cardVideo(media, on) {
+  let v = media.querySelector("video.hover");
+  if (on && !v) {
+    v = document.createElement("video"); v.className = "hover"; v.src = media.dataset.hover; v.muted = true; v.loop = true; v.playsInline = true; v.preload = "auto";
+    v.addEventListener("playing", () => v.classList.add("on")); media.append(v);
+  }
+  if (!v) return;
+  if (on) v.play().catch(() => {}); else { v.classList.remove("on"); v.pause(); v.remove(); }
+}
+const inView = "IntersectionObserver" in window ? new IntersectionObserver((es) => es.forEach((e) => {
+  const el = e.target, on = e.isIntersecting && e.intersectionRatio >= 0.6 && view === "simple";
+  if (el.tagName === "VIDEO") { if (on) el.play().catch(() => {}); else el.pause(); } else cardVideo(el, on);
+}), { threshold: [0, 0.6] }) : null;
+function watchSimpleVideos() {
+  if (!inView) return;
+  document.querySelectorAll("#simple video[data-auto]").forEach((v) => inView.observe(v));
+  if (coarse) document.querySelectorAll("#sGrid .sv-media[data-hover]").forEach((m) => inView.observe(m));
+}
+$("sGrid").addEventListener("pointerover", (e) => {
+  if (e.pointerType !== "mouse") return;
+  const m = e.target.closest(".sv-card")?.querySelector(".sv-media[data-hover]"); if (m && !m.contains(e.relatedTarget)) cardVideo(m, true);
+});
+$("sGrid").addEventListener("pointerout", (e) => {
+  if (e.pointerType !== "mouse") return;
+  const card = e.target.closest(".sv-card"); if (!card || card.contains(e.relatedTarget)) return;
+  const m = card.querySelector(".sv-media[data-hover]"); if (m) cardVideo(m, false);
+});
+watchSimpleVideos();
 const reelVid = $("svReelVid");
 if (reelVid) reelVid.addEventListener("timeupdate", () => {
   let on = -1; SHOWREEL.chapters.forEach((c, k) => { if (c.at != null && reelVid.currentTime >= c.at - 0.05) on = k; });
@@ -360,7 +392,9 @@ const skyDome = new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ vertexColor
 skyDome.renderOrder = -1; scene.add(skyDome);
 const DAYSKY = new THREE.Color(0xA9D3F0);
 const FOG = { day: new THREE.Fog(0xE3EEF3, 220, 820), night: new THREE.FogExp2(0x070A12, 0.0038), bp: new THREE.FogExp2(0x0B2447, 0.0035) };
-const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1600);
+/* ground layers (roads 0.05/0.10, dashes 0.15/0.17, rings 0.2) sit a few cm apart; the near plane is raised in Spectate so depth
+   precision at overview distance can still separate them (a 0.1 near plane made them z-fight and flicker) */
+const camera = new THREE.PerspectiveCamera(60, 1, 0.5, 1600);
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const hemi = new THREE.HemisphereLight(0x6680bb, 0x0a0c14, 0.55); scene.add(hemi);
@@ -374,20 +408,20 @@ const lotCenter = (i, j) => new THREE.Vector3((i - (NX - 1) / 2) * PITCH, 0, (j 
 const EX = NX / 2 * PITCH + 18, EZ = NZ / 2 * PITCH + 18, EXTENT = Math.max(EX, EZ), SCALE = EXTENT / 133;   /* 133 = the old city's extent, for scaling world-wide numbers */
 sc.left = -(EXTENT + 20); sc.right = EXTENT + 20; sc.top = EXTENT + 20; sc.bottom = -(EXTENT + 20); sc.updateProjectionMatrix();
 /* districts = portfolio sections, one per row */
-const LAYOUT = { kingdomland: [0, 0], nayzak: [1, 0], wahm: [2, 0], "kick-arena": [3, 0], tamr: [4, 0],
-  "mars-simulation": [0, 1], orionmeta: [1, 1], "island-of-deceit": [2, 1],
-  "you-will-die": [0, 2], "tank-game": [1, 2], "hack-and-slash-arpg": [2, 2], "space-fighter": [3, 2], "scifi-sim-escape": [4, 2],
-  "kungfu-karate": [0, 3], "mototraffic-rider": [1, 3], "fps-commando": [2, 3], "boba-tea": [3, 3], "reader-bee": [4, 3],
-  "bank-manager": [0, 4], "bank-atm": [1, 4], "virtual-mom": [2, 4] };
+/* lots are filled in project order (favourites first, projects without video last): the row facing the spawn first, then outward */
 const SPECIAL_LOTS = { about: [3, 1], contact: [4, 1] }, PARK_LOTS = [[4, 4]], PLAZA_LOT = [3, 4];
-const DISTRICTS = ["Team projects", "Unreal and web", "Unreal and personal", "Mobile arcade", "Sim street"];
-/* any project without a fixed lot takes the next free one, so new projects always get a building */
+const DISTRICTS = ["Coming soon", "More projects", "More projects", "Favourites", "Highlights"];   /* by row: back (0) to the plaza row (4) */
+const LAYOUT = {};
 {
-  const taken = new Set([...Object.values(LAYOUT), ...Object.values(SPECIAL_LOTS), ...PARK_LOTS, PLAZA_LOT].map(([a, b]) => a + "," + b));
-  PROJECTS.forEach((p) => {
-    if (LAYOUT[p.id]) return;
-    for (let j = 0; j < NZ && !LAYOUT[p.id]; j++) for (let i = 0; i < NX; i++) if (!taken.has(i + "," + j)) { LAYOUT[p.id] = [i, j]; taken.add(i + "," + j); break; }
-  });
+  const taken = new Set([...Object.values(SPECIAL_LOTS), ...PARK_LOTS, PLAZA_LOT].map(([a, b]) => a + "," + b)), free = [];
+  /* the row the jet faces at spawn first, then the plaza's own row, then further back */
+  for (const j of [NZ - 2, NZ - 1, ...Array.from({ length: NZ - 2 }, (_, k) => NZ - 3 - k)]) {
+    const row = [];
+    for (let i = 0; i < NX; i++) if (!taken.has(i + "," + j)) row.push([i, j]);
+    row.sort((a, b) => Math.abs(a[0] - PLAZA_LOT[0]) - Math.abs(b[0] - PLAZA_LOT[0]) || a[0] - b[0]);   /* nearest the plaza first */
+    free.push(...row);
+  }
+  PROJECTS.forEach((p, k) => { LAYOUT[p.id] = free[k] || [0, 0]; });
 }
 
 /* materials that change with the look: every swappable mesh keeps {day, night} in userData.mats */
@@ -411,17 +445,17 @@ const walkMats = { day: new THREE.MeshStandardMaterial({ color: 0xD3CCC0, roughn
 const world = new THREE.Group(); scene.add(world);
 const dayOnly = [], nightOnly = [], notBp = [];
 for (let k = 0; k <= NZ; k++) { const r = (k - NZ / 2) * PITCH;
-  const a = dual(new THREE.Mesh(new THREE.PlaneGeometry(EX * 2, 18), roadMats.day), roadMats.day, roadMats.night); a.rotation.x = -Math.PI / 2; a.position.set(0, 0.02, r); a.receiveShadow = true; world.add(a); notBp.push(a); }
+  const a = dual(new THREE.Mesh(new THREE.PlaneGeometry(EX * 2, 18), roadMats.day), roadMats.day, roadMats.night); a.rotation.x = -Math.PI / 2; a.position.set(0, 0.05, r); a.receiveShadow = true; world.add(a); notBp.push(a); }
 for (let k = 0; k <= NX; k++) { const r = (k - NX / 2) * PITCH;
-  const b = dual(new THREE.Mesh(new THREE.PlaneGeometry(18, EZ * 2), roadMats.day), roadMats.day, roadMats.night); b.rotation.x = -Math.PI / 2; b.position.set(r, 0.021, 0); b.receiveShadow = true; world.add(b); notBp.push(b); }
+  const b = dual(new THREE.Mesh(new THREE.PlaneGeometry(18, EZ * 2), roadMats.day), roadMats.day, roadMats.night); b.rotation.x = -Math.PI / 2; b.position.set(r, 0.10, 0); b.receiveShadow = true; world.add(b); notBp.push(b); }
 const dashCanvas = document.createElement("canvas"); dashCanvas.width = 64; dashCanvas.height = 8;
 const dctx = dashCanvas.getContext("2d"); dctx.fillStyle = "#FFFFFF"; dctx.fillRect(0, 2, 32, 4);
 const dashTex = new THREE.CanvasTexture(dashCanvas); dashTex.wrapS = THREE.RepeatWrapping; dashTex.repeat.set(40, 1);
 const dashMats = { day: new THREE.MeshBasicMaterial({ map: dashTex, transparent: true, color: 0xF4F1E8 }), night: new THREE.MeshBasicMaterial({ map: dashTex, transparent: true, color: 0x3A5A9E }) };
 for (let k = 0; k <= NZ; k++) { const r = (k - NZ / 2) * PITCH;
-  const a = dual(new THREE.Mesh(new THREE.PlaneGeometry(EX * 2, 0.5), dashMats.day), dashMats.day, dashMats.night); a.rotation.x = -Math.PI / 2; a.position.set(0, 0.04, r); world.add(a); notBp.push(a); }
+  const a = dual(new THREE.Mesh(new THREE.PlaneGeometry(EX * 2, 0.5), dashMats.day), dashMats.day, dashMats.night); a.rotation.x = -Math.PI / 2; a.position.set(0, 0.15, r); world.add(a); notBp.push(a); }
 for (let k = 0; k <= NX; k++) { const r = (k - NX / 2) * PITCH;
-  const b = dual(new THREE.Mesh(new THREE.PlaneGeometry(EZ * 2, 0.5), dashMats.day), dashMats.day, dashMats.night); b.rotation.x = -Math.PI / 2; b.rotation.z = Math.PI / 2; b.position.set(r, 0.041, 0); world.add(b); notBp.push(b); }
+  const b = dual(new THREE.Mesh(new THREE.PlaneGeometry(EZ * 2, 0.5), dashMats.day), dashMats.day, dashMats.night); b.rotation.x = -Math.PI / 2; b.rotation.z = Math.PI / 2; b.position.set(r, 0.17, 0); world.add(b); notBp.push(b); }
 /* plots: sidewalk slab + green plot outline (KingdomLand-style land grid) */
 /* the lawn sits 0.03 above the slab and is pulled toward the camera in depth, so it never shimmers against the slab from far away */
 const lawnOffset = { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 };
@@ -698,8 +732,9 @@ function makeBanner(holder, p, i, col, yaw) {
   const screen = bannerScreen(g, screenMat, i);
   const plate = bannerPlate(g, new THREE.MeshBasicMaterial({ map: nameplateTexture(p, CSSCOL[p.engine]) }));
   let video = null;
-  if (p.media.loop) {
-    video = document.createElement("video"); video.src = p.media.loop; video.muted = true; video.loop = true; video.playsInline = true; video.crossOrigin = "anonymous"; video.preload = "none";
+  /* the full video, muted so it may autoplay; only the nearest few banners play at once (updateBanners) */
+  if (p.media.video) {
+    video = document.createElement("video"); video.src = p.media.video; video.muted = true; video.loop = true; video.playsInline = true; video.crossOrigin = "anonymous"; video.preload = "none";
     if (p.media.poster) new THREE.TextureLoader().load(p.media.poster, (t) => { if (screenMat.map && !screenMat.map.isVideoTexture) { screenMat.map = t; screenMat.needsUpdate = true; } });
     screen.userData.videoTex = new THREE.VideoTexture(video);
   } else if (p.media.poster) {
@@ -721,7 +756,10 @@ function updateBanners() {
     bn.group.getWorldPosition(bn.world); bn.dist = camera.position.distanceTo(bn.world);
     if (!off && bn.dist < BANNER_PLAY_R) near.push(bn);
   });
-  const play = new Set(near.sort((a, b) => a.dist - b.dist).slice(0, BANNER_PLAY_MAX));
+  /* sticky: a playing banner keeps playing while it stays among the nearest few, so orbiting does not toggle videos on and off */
+  near.sort((a, b) => a.dist - b.dist);
+  const play = new Set(near.slice(0, BANNER_PLAY_MAX));
+  near.slice(BANNER_PLAY_MAX, BANNER_PLAY_MAX + 2).forEach((bn) => { if (bn.playing && play.size < BANNER_PLAY_MAX + 1) play.add(bn); });
   buildings.forEach((b) => {
     const bn = b.banner; if (!bn || !bn.video) return;
     const close = play.has(bn);
@@ -743,7 +781,7 @@ PROJECTS.forEach((p, i) => {
   const tag = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), new THREE.MeshBasicMaterial({ map: plotTag(i + 1, CSSCOL[p.engine]), transparent: true }));
   tag.rotation.x = -Math.PI / 2; tag.position.set(c.x - 8, 0.38, c.z + 12.2); scene.add(tag); notBp.push(tag);
   const pad = new THREE.Mesh(new THREE.RingGeometry(4.2, 5.4, 40), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
-  pad.rotation.x = -Math.PI / 2; pad.position.set(c.x, 0.08, c.z + PAD_Z); scene.add(pad);
+  pad.rotation.x = -Math.PI / 2; pad.position.set(c.x, 0.2, c.z + PAD_Z); scene.add(pad);
   buildings.push({ p, i, holder, sprite, pad, center: c, padPos: pad.position.clone(), h: info.top, banner, yaw });
   colliders.push({ x: c.x, z: c.z, rx: HALF + 2.2, rz: HALF + 2.2, h: info.top + 1 }); bannerColliders(c, yaw);
 });
@@ -842,7 +880,7 @@ SPECIALS.forEach((sp, k) => {
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex.day, transparent: true, depthWrite: false }));
   sprite.scale.set(16, 4, 1); sprite.position.set(c.x, Math.max(top, BANNER_TOP) + 5, c.z); sprite.userData = { label, tex }; scene.add(sprite);
   const pad = new THREE.Mesh(new THREE.RingGeometry(4.2, 5.4, 40), new THREE.MeshBasicMaterial({ color: sp.color, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
-  pad.rotation.x = -Math.PI / 2; pad.position.set(c.x, 0.08, c.z + PAD_Z); scene.add(pad);
+  pad.rotation.x = -Math.PI / 2; pad.position.set(c.x, 0.2, c.z + PAD_Z); scene.add(pad);
   /* info banner in front of the special building, same frame as the project banners */
   const yaw = bannerYaw(li, lj), ig = new THREE.Group(); ig.position.set(0, 0, BZ); ig.rotation.y = yaw; holder.add(ig);
   bannerFrame(ig, idx);
@@ -1537,6 +1575,7 @@ function travel(i, open) {
 hooks.travel = travel; hooks.focus = focus;
 hooks.onView = (v) => {
   Object.keys(keys).forEach((k) => keys[k] = false);
+  camera.near = v === "spectate" ? 3 : 0.5; camera.updateProjectionMatrix();
   if (v === "spectate") { orbit.goal.set(state.x * 0.3, 6, state.z * 0.3); orbit.goalR = 190 * SCALE; orbit.last = 0; }
   if (v === "drive") camSnap = true;
 };

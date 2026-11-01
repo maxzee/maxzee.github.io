@@ -51,8 +51,8 @@ media:
         title: "Boss in the Arena"
         text: "The same boss fight on the beach level, with the full environment and lighting."
 district: unreal
-order: 18
+order: 6
 height: 22
-featured: false
+featured: true
 ---
 

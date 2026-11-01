@@ -17,8 +17,8 @@ built: []
 media:
   video: media/NAYZAK_Concept_Demo (1).mp4
 visibility: 'yes'
-featured: true
-order: 2
+featured: false
+order: 7
 district: team
 height: 40
 ---

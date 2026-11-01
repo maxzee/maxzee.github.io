@@ -45,8 +45,8 @@ media:
         title: "Core Strike"
         text: "Expose the enforcer's core and destroy it with a single strike."
 district: unreal
-order: 20
+order: 4
 height: 24
-featured: false
+featured: true
 ---
 

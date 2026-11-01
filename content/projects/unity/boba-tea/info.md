@@ -28,7 +28,7 @@ stack:
   - - Economy
     - Shop customization
 district: mobile
-order: 12
+order: 18
 height: 12
 featured: false
 ---
