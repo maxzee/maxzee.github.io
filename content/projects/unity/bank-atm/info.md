@@ -4,7 +4,7 @@ name: Bank ATM Simulator
 engines:
   - unity
 engineLabel: Unity 3D
-platform: Mobile
+platform: 'Android, iOS'
 company: ''
 year: ''
 status: released
@@ -20,6 +20,12 @@ tags:
 built:
   - ATM flows that teach banking basics
   - Educational UI
+results:
+  - '1M+ downloads on Google Play'
+  - '4.1★ rating'
+links:
+  - label: Get it on Google Play
+    href: https://play.google.com/store/apps/details?id=com.pms.atm.machine.virtualbank.simulator
 visibility: 'yes'
 stack:
   - - Logic

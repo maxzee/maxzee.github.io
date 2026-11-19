@@ -21,6 +21,9 @@ built:
   - Real-time multiplayer over sockets
   - Virtual world exploration and social features
   - Browser performance and compatibility
+links:
+  - label: Visit OrionMeta
+    href: https://orionmeta.io/
 visibility: 'yes'
 featured: false
 media:

@@ -21,6 +21,12 @@ built:
   - Combat system with combos and special moves
   - Multiple playable fighters
   - Mobile performance optimization
+results:
+  - '1M+ downloads on Google Play'
+  - '4.8★ rating'
+links:
+  - label: Get it on Google Play
+    href: https://play.google.com/store/apps/details?id=com.toucangames.world.wrestling.ring.wrestlinggames
 visibility: 'yes'
 stack:
   - - Gameplay

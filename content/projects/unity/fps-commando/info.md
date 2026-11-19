@@ -21,6 +21,12 @@ built:
   - First-person controller
   - Weapon systems
   - Commando missions
+results:
+  - '100M+ downloads on Google Play'
+  - '4.2★ rating'
+links:
+  - label: Get it on Google Play
+    href: https://play.google.com/store/apps/details?id=com.sgs.antiterrorism.counterattack.commandomissiongame
 visibility: 'yes'
 media:
   video: 'media/Cover Fire FPS – Mobile Game Development (Unity, iOS & Android).mp4'

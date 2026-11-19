@@ -4,7 +4,7 @@ name: 'Family Simulator: Virtual Mom'
 engines:
   - unity
 engineLabel: Unity 3D
-platform: Mobile
+platform: 'Android, iOS'
 company: ''
 year: ''
 status: released
@@ -20,6 +20,12 @@ tags:
 built:
   - Daily-life simulation systems
   - Mobile UI
+results:
+  - '1M+ downloads on Google Play'
+  - '3.8★ rating'
+links:
+  - label: Get it on Google Play
+    href: https://play.google.com/store/apps/details?id=com.virtual.family.game
 visibility: 'yes'
 stack:
   - - Simulation
