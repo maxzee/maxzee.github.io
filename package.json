@@ -7,6 +7,7 @@
     "content": "tsx scripts/build-content.ts",
     "prerender": "tsx scripts/prerender.ts",
     "media": "tsx scripts/build-media.ts",
+    "store-art": "python scripts/store-art.py",
     "dev": "npm run content && npm run prerender && vite",
     "build": "npm run content && npm run prerender && tsc --noEmit && vite build",
     "preview": "vite preview"

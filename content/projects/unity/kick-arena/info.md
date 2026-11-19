@@ -28,6 +28,8 @@ stack:
   - [Economy, 'Coins, diamonds, arenas, cosmetics, IAP']
   - [Ads, AdMob and Unity Ads]
   - [Live ops, 'Firebase, PostHog, Adjust, push notifications']
+results:
+  - '10K+ downloads on Google Play'
 links:
   - label: Get it on Google Play
     href: https://play.google.com/store/apps/details?id=com.kick.arena
